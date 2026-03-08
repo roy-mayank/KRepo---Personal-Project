@@ -1,31 +1,20 @@
-# Temporarily using llamaparse with the idea of shifting to huggingface at some point later?
-# Not tested!!!
-
 import asyncio
 import os
+from pathlib import Path
 
 from llama_cloud import AsyncLlamaCloud
+from dotenv import load_dotenv
 
-# Not tested!!!
-pdf_files = list(os.path.join(os.path.dirname(__file__), "..", "input").glob("*.pdf"))
+load_dotenv()
 
-# Initialize parser
 llama_cloud_client = AsyncLlamaCloud(
     api_key=os.getenv("LLAMA_CLOUD_API_KEY"),
 )
 
-# Create semaphore to limit concurrent requests
-semaphore = asyncio.Semaphore(2)
 
-# A helper function to parse a single file with semaphore
-async def parse_single_file(
-    file_path,
-    semaphore,
-):
+async def parse_single_file(file_path: Path, semaphore: asyncio.Semaphore) -> dict:
     async with semaphore:
         try:
-            print(f"Starting parse: {file_path.name}")
-
             file_obj = await llama_cloud_client.files.create(
                 file=str(file_path),
                 purpose="parse",
@@ -33,13 +22,11 @@ async def parse_single_file(
             )
 
             result = await llama_cloud_client.parsing.parse(
-                tier="cost_effective", # Change later to "agentic" or "fast"
+                tier="cost_effective",
                 version="latest",
                 file_id=file_obj.id,
                 expand=["text", "metadata"],
             )
-
-            print(f"✓ Completed: {file_path.name} ({len(result.items.pages)} pages)")
 
             return {
                 "file": file_path.name,
@@ -48,17 +35,17 @@ async def parse_single_file(
                 "pages": len(result.items.pages) if result.items.pages else 0,
             }
         except Exception as e:
-            print(f"✗ Error parsing {file_path.name}: {str(e)}")
             return {
                 "file": file_path.name,
                 "status": "error",
                 "error": str(e),
             }
 
-# Create tasks for all files
-tasks = [
-    parse_single_file(pdf_file, semaphore)
-    for pdf_file in pdf_files
-]
 
-results = await asyncio.gather(*tasks)
+async def parse_all_pdfs(input_dir: str | Path, max_concurrent: int = 2) -> list[dict]:
+    input_path = Path(input_dir)
+    pdf_files = list(input_path.glob("*.pdf"))
+    semaphore = asyncio.Semaphore(max_concurrent)
+
+    tasks = [parse_single_file(pdf, semaphore) for pdf in pdf_files]
+    return await asyncio.gather(*tasks)
