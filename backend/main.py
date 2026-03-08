@@ -2,8 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from chat.router import router as chat_router
-from rag.router import router as rag_router
 from rag.documents import router as documents_router
+from rag.router import router as rag_router
 
 app = FastAPI(title="KRepo API")
 

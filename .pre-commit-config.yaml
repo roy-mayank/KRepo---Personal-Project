@@ -1,6 +1,22 @@
 repos:
   - repo: local
     hooks:
+      - id: ruff-format
+        name: ruff format
+        entry: bash -c 'cd backend && uv run ruff format .'
+        language: system
+        types: [python]
+        pass_filenames: false
+        files: ^backend/
+
+      - id: ruff-lint
+        name: ruff lint
+        entry: bash -c 'cd backend && uv run ruff check --fix .'
+        language: system
+        types: [python]
+        pass_filenames: false
+        files: ^backend/
+
       - id: basedpyright
         name: basedpyright
         entry: bash -c 'cd backend && uv run basedpyright .'
@@ -8,3 +24,10 @@ repos:
         types: [python]
         pass_filenames: false
         files: ^backend/
+
+      - id: prettier
+        name: prettier
+        entry: bash -c 'cd frontend && npx prettier --write .'
+        language: system
+        pass_filenames: false
+        files: ^frontend/src/

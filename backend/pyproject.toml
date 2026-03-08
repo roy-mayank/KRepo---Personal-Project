@@ -19,10 +19,21 @@ dependencies = [
     "beautifulsoup4>=4.14.3",
     "fastembed>=0.7.4",
     "pypdf>=6.7.5",
+    "python-multipart>=0.0.22",
 ]
 
 [dependency-groups]
-dev = ["basedpyright", "pre-commit"]
+dev = [
+    "basedpyright",
+    "pre-commit",
+    "ruff>=0.15.5",
+]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
 
 [tool.basedpyright]
 venvPath = "."

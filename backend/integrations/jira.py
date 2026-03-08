@@ -9,9 +9,7 @@ from settings import settings
 
 class JiraIntegration(BaseIntegration):
     def __init__(self, project_keys: list[str] | None = None, access_token: str | None = None):
-        self.project_keys = project_keys or [
-            k.strip() for k in settings.JIRA_PROJECT_KEYS.split(",") if k.strip()
-        ]
+        self.project_keys = project_keys or [k.strip() for k in settings.JIRA_PROJECT_KEYS.split(",") if k.strip()]
         self.access_token = access_token or settings.JIRA_ACCESS_TOKEN
         self.domain = settings.JIRA_DOMAIN
         self.headers = {
@@ -19,7 +17,13 @@ class JiraIntegration(BaseIntegration):
             "Accept": "application/json",
         }
 
-    async def _request_with_retry(self, client: httpx.AsyncClient, url: str, params: dict[str, str] | None = None, max_retries: int = 4) -> httpx.Response:
+    async def _request_with_retry(
+        self,
+        client: httpx.AsyncClient,
+        url: str,
+        params: dict[str, str] | None = None,
+        max_retries: int = 4,
+    ) -> httpx.Response:
         resp: httpx.Response | None = None
         for _attempt in range(max_retries):
             resp = await client.get(url, headers=self.headers, params=params)

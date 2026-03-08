@@ -1,4 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { Upload, FileText, Trash2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { ScrollArea } from '@/components/ui/scroll-area'
 
 const API_URL = import.meta.env.VITE_API_URL
 
@@ -7,6 +11,7 @@ export default function DocumentUpload() {
   const [uploading, setUploading] = useState(false)
   const [dragActive, setDragActive] = useState(false)
   const [message, setMessage] = useState(null)
+  const fileInputRef = useRef(null)
 
   const fetchDocuments = useCallback(async () => {
     try {
@@ -75,64 +80,87 @@ export default function DocumentUpload() {
   }
 
   return (
-    <div className="documents-container">
-      <div className="documents-header">
-        <h2>Documents</h2>
-      </div>
+    <Card className="flex h-full flex-col p-4 gap-4">
+      <h2 className="text-lg font-semibold">Documents</h2>
 
       <div
-        className={`upload-zone ${dragActive ? 'active' : ''}`}
-        onDragOver={(e) => { e.preventDefault(); setDragActive(true) }}
+        className={`flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-8 cursor-pointer transition-colors ${
+          dragActive ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+        }`}
+        onDragOver={(e) => {
+          e.preventDefault()
+          setDragActive(true)
+        }}
         onDragLeave={() => setDragActive(false)}
         onDrop={handleDrop}
-        onClick={() => document.getElementById('file-input').click()}
+        onClick={() => fileInputRef.current?.click()}
       >
         <input
-          id="file-input"
+          ref={fileInputRef}
           type="file"
           multiple
           accept=".pdf,.txt,.md,.csv,.json"
-          style={{ display: 'none' }}
+          className="hidden"
           onChange={(e) => handleUpload(e.target.files)}
         />
+        <Upload className="h-8 w-8 text-muted-foreground" />
         {uploading ? (
-          <p>Uploading...</p>
+          <p className="text-sm text-muted-foreground">Uploading...</p>
         ) : (
-          <p>Drop files here or click to upload<br />
-            <span className="upload-hint">PDF, TXT, MD, CSV, JSON</span>
-          </p>
+          <>
+            <p className="text-sm text-muted-foreground">Drop files here or click to upload</p>
+            <p className="text-xs text-muted-foreground/60">PDF, TXT, MD, CSV, JSON</p>
+          </>
         )}
       </div>
 
       {message && (
-        <div className={`upload-message ${message.type}`}>
+        <div
+          className={`rounded-lg px-4 py-2.5 text-sm ${
+            message.type === 'success'
+              ? 'bg-green-500/10 text-green-500'
+              : 'bg-destructive/10 text-destructive'
+          }`}
+        >
           {message.text}
         </div>
       )}
 
-      <div className="documents-list">
-        <h3>Ingested Documents</h3>
-        {documents.length === 0 ? (
-          <p className="documents-empty">No documents ingested yet.</p>
-        ) : (
-          <ul>
-            {documents.map((doc) => (
-              <li key={doc.source_id} className="document-item">
-                <div className="document-info">
-                  <span className="document-title">{doc.title}</span>
-                  <span className="document-source">{doc.source}</span>
-                </div>
-                <button
-                  className="document-delete"
-                  onClick={(e) => { e.stopPropagation(); handleDelete(doc.source_id) }}
+      <div className="flex flex-col gap-2">
+        <h3 className="text-sm font-medium text-muted-foreground">Ingested Documents</h3>
+        <ScrollArea className="flex-1">
+          {documents.length === 0 ? (
+            <p className="text-sm text-muted-foreground/60 py-4 text-center">
+              No documents ingested yet.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {documents.map((doc) => (
+                <div
+                  key={doc.source_id}
+                  className="flex items-center justify-between rounded-lg bg-muted px-4 py-3"
                 >
-                  Remove
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+                  <div className="flex items-center gap-3">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">{doc.title}</p>
+                      <p className="text-xs text-muted-foreground uppercase">{doc.source}</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => handleDelete(doc.source_id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </ScrollArea>
       </div>
-    </div>
+    </Card>
   )
 }

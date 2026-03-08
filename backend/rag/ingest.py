@@ -1,6 +1,6 @@
+from fastembed import TextEmbedding
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from qdrant_client import QdrantClient, models
-from fastembed import TextEmbedding
 
 from integrations.base import BaseIntegration, Document
 from settings import settings
@@ -83,5 +83,6 @@ def _ingest_document(client: QdrantClient, embedder: TextEmbedding, doc: Documen
 
 def _make_point_id(source: str, source_id: str, chunk_index: int) -> str:
     import hashlib
+
     raw = f"{source}:{source_id}:{chunk_index}"
     return hashlib.md5(raw.encode()).hexdigest()  # noqa: S324

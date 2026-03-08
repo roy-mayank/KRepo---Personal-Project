@@ -1,12 +1,12 @@
 import io
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, UploadFile, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile
 from pydantic import BaseModel
 from pypdf import PdfReader
 
 from integrations.base import Document
-from rag.ingest import _ingest_document, get_qdrant_client, get_embedding_model, ensure_collection, COLLECTION_NAME
+from rag.ingest import COLLECTION_NAME, _ingest_document, ensure_collection, get_embedding_model, get_qdrant_client
 
 router = APIRouter(prefix="/documents")
 
@@ -104,16 +104,14 @@ async def list_documents() -> DocumentListResponse:
 
 @router.delete("/{source_id:path}")
 async def delete_document(source_id: str) -> DeleteResponse:
-    from qdrant_client.models import Filter, FieldCondition, MatchValue
+    from qdrant_client.models import FieldCondition, Filter, MatchValue
 
     client = get_qdrant_client()
     ensure_collection(client)
 
     client.delete(
         collection_name=COLLECTION_NAME,
-        points_selector=Filter(
-            must=[FieldCondition(key="source_id", match=MatchValue(value=source_id))]
-        ),
+        points_selector=Filter(must=[FieldCondition(key="source_id", match=MatchValue(value=source_id))]),
     )
 
     return DeleteResponse(deleted=True, source_id=source_id)

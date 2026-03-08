@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 @dataclass
 class Document:
     """Universal unit of ingested content."""
+
     source: str
     source_id: str
     title: str

@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 
-from qdrant_client import QdrantClient, models
+from qdrant_client import models
 
-from rag.ingest import get_qdrant_client, get_embedding_model, COLLECTION_NAME, ensure_collection
+from rag.ingest import COLLECTION_NAME, ensure_collection, get_embedding_model, get_qdrant_client
 
 
 @dataclass

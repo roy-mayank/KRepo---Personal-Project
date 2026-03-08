@@ -3,9 +3,9 @@ from typing import Any
 
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, SecretStr
 from langchain_anthropic import ChatAnthropic
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from pydantic import BaseModel, SecretStr
 
 from rag.retriever import retrieve
 from settings import settings
@@ -42,9 +42,7 @@ def _build_context(query: str) -> str:
 
     context_parts: list[str] = []
     for chunk in chunks:
-        context_parts.append(
-            f"[{chunk.source}] {chunk.title}\n{chunk.content}\nSource: {chunk.url}"
-        )
+        context_parts.append(f"[{chunk.source}] {chunk.title}\n{chunk.content}\nSource: {chunk.url}")
     return "\n\n---\n\n".join(context_parts)
 
 

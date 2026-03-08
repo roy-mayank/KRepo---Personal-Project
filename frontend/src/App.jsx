@@ -1,29 +1,28 @@
 import { useState } from 'react'
-import Chat from './components/Chat'
-import DocumentUpload from './components/DocumentUpload'
-import './App.css'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import Chat from '@/components/Chat'
+import DocumentUpload from '@/components/DocumentUpload'
 
 function App() {
-  const [tab, setTab] = useState('chat')
-
   return (
-    <div className="app">
-      <nav className="app-nav">
-        <button
-          className={`nav-tab ${tab === 'chat' ? 'active' : ''}`}
-          onClick={() => setTab('chat')}
-        >
-          Chat
-        </button>
-        <button
-          className={`nav-tab ${tab === 'documents' ? 'active' : ''}`}
-          onClick={() => setTab('documents')}
-        >
-          Documents
-        </button>
-      </nav>
-      <div className="app-content">
-        {tab === 'chat' ? <Chat /> : <DocumentUpload />}
+    <div className="dark flex h-screen w-full items-center justify-center bg-background p-4">
+      <div className="flex h-full w-full max-w-3xl flex-col">
+        <Tabs defaultValue="chat" className="flex h-full flex-col">
+          <TabsList className="w-full">
+            <TabsTrigger value="chat" className="flex-1">
+              Chat
+            </TabsTrigger>
+            <TabsTrigger value="documents" className="flex-1">
+              Documents
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="chat" className="flex-1 overflow-hidden">
+            <Chat />
+          </TabsContent>
+          <TabsContent value="documents" className="flex-1 overflow-hidden">
+            <DocumentUpload />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   )

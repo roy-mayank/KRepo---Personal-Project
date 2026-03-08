@@ -1,4 +1,4 @@
-.PHONY: install backend frontend dev typecheck lint
+.PHONY: install backend frontend dev typecheck lint format
 
 install:
 	cd backend && uv sync --dev
@@ -18,3 +18,7 @@ typecheck:
 
 lint:
 	cd backend && uv run pre-commit run --all-files
+
+format:
+	cd backend && uv run ruff format . && uv run ruff check --fix .
+	cd frontend && npx prettier --write .

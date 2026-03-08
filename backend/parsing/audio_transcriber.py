@@ -13,9 +13,7 @@ def transcribe_audio(file_path: str | Path) -> str:
     if not file_path.is_file():
         raise FileNotFoundError(f"Audio file not found: {file_path}")
 
-    headers = {
-        "Authorization": f"Bearer {settings.LEMONFOX_API_KEY}"
-    }
+    headers = {"Authorization": f"Bearer {settings.LEMONFOX_API_KEY}"}
 
     with open(file_path, "rb") as f:
         response = requests.post(
