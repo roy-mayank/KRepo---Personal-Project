@@ -1,13 +1,9 @@
 import asyncio
-import os
 from typing import Any
 
 import httpx
-from dotenv import load_dotenv
 
-_ = load_dotenv()
-
-JIRA_DOMAIN = os.getenv("JIRA_DOMAIN")
+from settings import settings
 
 
 async def _request_with_retry(client: httpx.AsyncClient, url: str, headers: dict[str, str], max_retries: int = 4) -> httpx.Response:
@@ -47,7 +43,7 @@ async def fetch_all_jira_issues(project_key: str, access_token: str) -> list[dic
             if next_page_token:
                 params["nextPageToken"] = next_page_token
 
-            url = f"https://{JIRA_DOMAIN}/rest/api/3/search/jql"
+            url = f"https://{settings.JIRA_DOMAIN}/rest/api/3/search/jql"
             resp = await client.get(url, params=params, headers=headers)
             resp.raise_for_status()
 
@@ -57,7 +53,7 @@ async def fetch_all_jira_issues(project_key: str, access_token: str) -> list[dic
             for issue in issues:
                 comment_resp = await _request_with_retry(
                     client,
-                    f"https://{JIRA_DOMAIN}/rest/api/3/issue/{issue['key']}/comment",
+                    f"https://{settings.JIRA_DOMAIN}/rest/api/3/issue/{issue['key']}/comment",
                     headers,
                 )
                 if comment_resp.status_code == 200:

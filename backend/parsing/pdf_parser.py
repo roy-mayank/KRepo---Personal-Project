@@ -1,15 +1,13 @@
 import asyncio
-import os
 from pathlib import Path
 from typing import Any
 
 from llama_cloud import AsyncLlamaCloud
-from dotenv import load_dotenv
 
-_ = load_dotenv()
+from settings import settings
 
 llama_cloud_client = AsyncLlamaCloud(
-    api_key=os.getenv("LLAMA_CLOUD_API_KEY"),
+    api_key=settings.LLAMA_CLOUD_API_KEY,
 )
 
 

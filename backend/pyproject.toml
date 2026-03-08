@@ -12,6 +12,7 @@ dependencies = [
     "llama-cloud",
     "langchain",
     "langchain-anthropic",
+    "pydantic-settings>=2.13.1",
 ]
 
 [dependency-groups]

@@ -1,11 +1,9 @@
-import os
 from pathlib import Path
 from typing import Any
 
 import requests
-from dotenv import load_dotenv
 
-_ = load_dotenv()
+from settings import settings
 
 LEMONFOX_URL = "https://api.lemonfox.ai/v1/audio/transcriptions"
 
@@ -16,7 +14,7 @@ def transcribe_audio(file_path: str | Path) -> str:
         raise FileNotFoundError(f"Audio file not found: {file_path}")
 
     headers = {
-        "Authorization": f"Bearer {os.getenv('LEMONFOX_API_KEY')}"
+        "Authorization": f"Bearer {settings.LEMONFOX_API_KEY}"
     }
 
     with open(file_path, "rb") as f:
