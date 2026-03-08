@@ -2,7 +2,7 @@ import { useChat } from '@ai-sdk/react'
 
 export default function Chat() {
   const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
-    api: 'http://localhost:8000/chat',
+    api: `${import.meta.env.VITE_API_URL}/chat`,
   })
 
   return (

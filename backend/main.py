@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from chat.router import router as chat_router
 from rag.router import router as rag_router
+from rag.documents import router as documents_router
 
 app = FastAPI(title="KRepo API")
 
@@ -16,6 +17,7 @@ app.add_middleware(
 
 app.include_router(chat_router)
 app.include_router(rag_router)
+app.include_router(documents_router)
 
 
 @app.get("/health")
