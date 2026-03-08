@@ -1,0 +1,10 @@
+repos:
+  - repo: local
+    hooks:
+      - id: basedpyright
+        name: basedpyright
+        entry: bash -c 'cd backend && uv run basedpyright .'
+        language: system
+        types: [python]
+        pass_filenames: false
+        files: ^backend/
