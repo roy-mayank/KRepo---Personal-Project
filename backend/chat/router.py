@@ -3,12 +3,11 @@ from typing import Any
 
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, SecretStr
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 
-from pydantic import SecretStr
-
+from rag.retriever import retrieve
 from settings import settings
 
 router = APIRouter()
@@ -22,7 +21,8 @@ llm = ChatAnthropic(
 
 SYSTEM_PROMPT = (
     "You are KRepo Assistant, a helpful AI that answers questions about a company's "
-    "internal knowledge base. Be concise and helpful."
+    "internal knowledge base. Be concise and helpful. Use the provided context to answer "
+    "questions. If the context doesn't contain relevant information, say so."
 )
 
 
@@ -35,8 +35,32 @@ class ChatRequest(BaseModel):
     messages: list[Message]
 
 
+def _build_context(query: str) -> str:
+    chunks = retrieve(query, top_k=10)
+    if not chunks:
+        return ""
+
+    context_parts: list[str] = []
+    for chunk in chunks:
+        context_parts.append(
+            f"[{chunk.source}] {chunk.title}\n{chunk.content}\nSource: {chunk.url}"
+        )
+    return "\n\n---\n\n".join(context_parts)
+
+
 def _to_langchain_messages(messages: list[Message]) -> list[Any]:
-    lc_messages: list[Any] = [SystemMessage(content=SYSTEM_PROMPT)]
+    last_user_msg = ""
+    for msg in reversed(messages):
+        if msg.role == "user":
+            last_user_msg = msg.content
+            break
+
+    context = _build_context(last_user_msg)
+    system_content = SYSTEM_PROMPT
+    if context:
+        system_content += f"\n\nRelevant context from the knowledge base:\n\n{context}"
+
+    lc_messages: list[Any] = [SystemMessage(content=system_content)]
     for msg in messages:
         if msg.role == "user":
             lc_messages.append(HumanMessage(content=msg.content))
