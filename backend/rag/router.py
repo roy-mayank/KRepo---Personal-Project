@@ -1,8 +1,8 @@
 from fastapi import APIRouter, BackgroundTasks
 from pydantic import BaseModel
 
-from integrations.jira import JiraIntegration
-from rag.ingest import ingest_integration
+from ..integrations.jira import JiraIntegration
+from .ingest import ingest_integration
 
 router = APIRouter()
 

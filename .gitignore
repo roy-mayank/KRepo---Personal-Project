@@ -29,3 +29,5 @@ frontend/dist-ssr/
 *.sln
 *.sw?
 *.local
+
+.env

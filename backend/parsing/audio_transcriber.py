@@ -3,7 +3,7 @@ from typing import Any
 
 import requests
 
-from settings import settings
+from ..settings import settings
 
 LEMONFOX_URL = "https://api.lemonfox.ai/v1/audio/transcriptions"
 

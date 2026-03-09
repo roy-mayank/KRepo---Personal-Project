@@ -3,8 +3,8 @@ from typing import Any, AsyncIterator
 
 import httpx
 
-from integrations.base import BaseIntegration, Document
-from settings import settings
+from ..settings import settings
+from .base import BaseIntegration, Document
 
 
 class JiraIntegration(BaseIntegration):

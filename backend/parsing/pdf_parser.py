@@ -4,7 +4,7 @@ from typing import Any
 
 from llama_cloud import AsyncLlamaCloud
 
-from settings import settings
+from ..settings import settings
 
 llama_cloud_client = AsyncLlamaCloud(
     api_key=settings.LLAMA_CLOUD_API_KEY,

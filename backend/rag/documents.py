@@ -5,8 +5,8 @@ from fastapi import APIRouter, HTTPException, UploadFile
 from pydantic import BaseModel
 from pypdf import PdfReader
 
-from integrations.base import Document
-from rag.ingest import COLLECTION_NAME, _ingest_document, ensure_collection, get_embedding_model, get_qdrant_client
+from ..integrations.base import Document
+from .ingest import COLLECTION_NAME, _ingest_document, ensure_collection, get_embedding_model, get_qdrant_client
 
 router = APIRouter(prefix="/documents")
 

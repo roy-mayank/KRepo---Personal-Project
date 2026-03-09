@@ -7,8 +7,8 @@ from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel, SecretStr
 
-from rag.retriever import retrieve
-from settings import settings
+from ..rag.retriever import retrieve
+from ..settings import settings
 
 router = APIRouter()
 

@@ -1,0 +1,11 @@
+{
+  "include": ["backend"],
+  "typeCheckingMode": "standard",
+  "reportAny": false,
+  "reportExplicitAny": false,
+  "reportUnknownVariableType": false,
+  "reportUnknownMemberType": false,
+  "reportUnknownArgumentType": false,
+  "reportUnannotatedClassAttribute": false,
+  "reportPrivateUsage": false
+}
