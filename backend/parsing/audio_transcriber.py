@@ -1,9 +1,11 @@
 from pathlib import Path
-from typing import Any
+from typing import Any, List
 
+# regex used for sentence splitting moved to parsing.ingest
 import requests
 
 from ..settings import settings
+from .ingest import _chunk_by_sentences
 
 LEMONFOX_URL = "https://api.lemonfox.ai/v1/audio/transcriptions"
 
@@ -27,11 +29,21 @@ def transcribe_audio(file_path: str | Path) -> str:
     return result.get("text", "")
 
 
-def transcribe_and_append(file_path: str | Path, output_file: str | Path) -> str:
+def transcribe_audio_chunks(file_path: str | Path, sentences_per_chunk: int = 3) -> List[str]:
+
     text = transcribe_audio(file_path)
-    if text:
+    if not text:
+        return []
+    return _chunk_by_sentences(text, sentences_per_chunk)
+
+
+def transcribe_and_append_chunks(
+    file_path: str | Path, output_file: str | Path, sentences_per_chunk: int = 3
+) -> List[str]:
+    chunks = transcribe_audio_chunks(file_path, sentences_per_chunk)
+    if chunks:
         output_path = Path(output_file)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         with open(output_path, "a", encoding="utf-8") as out:
-            _ = out.write(text + "\n")
-    return text
+            out.write("\n".join(chunks) + "\n")
+    return chunks
