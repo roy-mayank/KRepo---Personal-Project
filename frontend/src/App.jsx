@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import Chat from '@/components/Chat'
 import DocumentUpload from '@/components/DocumentUpload'
+import Onboarding from '@/components/Onboarding'
 
 function App() {
   return (
@@ -15,12 +16,18 @@ function App() {
             <TabsTrigger value="documents" className="flex-1">
               Documents
             </TabsTrigger>
+            <TabsTrigger value="onboarding" className="flex-1">
+              Onboarding
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="chat" className="flex-1 overflow-hidden">
             <Chat />
           </TabsContent>
           <TabsContent value="documents" className="flex-1 overflow-hidden">
             <DocumentUpload />
+          </TabsContent>
+          <TabsContent value="onboarding" className="flex-1 overflow-hidden">
+            <Onboarding />
           </TabsContent>
         </Tabs>
       </div>

@@ -10,7 +10,7 @@ Additional features would include:
 
 - indexing for quick access of concepts, with the option to dive into more niche topics on each screen
 - Option to ask questions ofc (chatbot)
-- Where in the learning curve am I?
+- Where in the learning curve am I? (new "Onboarding" tab that generates concept lists and learning paths)
 
 ##### Intended Positioning Statement (temp)
 

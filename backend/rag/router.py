@@ -1,7 +1,7 @@
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile
 from pydantic import BaseModel
 
-from ..integrations.jira import JiraIntegration
+from ..integrations import available, get_integration
 from .ingest import ingest_integration
 
 router = APIRouter()
@@ -20,12 +20,12 @@ class IngestStatusResponse(BaseModel):
 async def _run_ingestion(source: str) -> None:
     _ingest_status[source] = "running"
     try:
-        if source == "jira":
-            integration = JiraIntegration()
-        else:
+        cls = get_integration(source)
+        if cls is None:
             _ingest_status[source] = f"error: unknown source '{source}'"
             return
 
+        integration = cls()
         count = await ingest_integration(integration)
         _ingest_status[source] = f"completed: {count} chunks ingested"
     except Exception as e:
@@ -42,3 +42,31 @@ async def ingest(source: str, background_tasks: BackgroundTasks) -> IngestRespon
 @router.get("/ingest/status")
 async def ingest_status() -> IngestStatusResponse:
     return IngestStatusResponse(status=_ingest_status)
+
+
+@router.get("/integrations")
+async def list_integrations() -> dict[str, str]:
+    return available()
+
+
+@router.post("/ingest/audio")
+async def ingest_audio(
+    file: UploadFile = File(...),
+    max_authorization_level: int | None = Form(None),
+) -> IngestResponse:
+
+    from ..parsing.ingest import ingest_audio_transcript
+
+    try:
+        contents = await file.read()
+        # write to temp file on disk to satisfy the existing helper
+        import tempfile
+        from pathlib import Path
+
+        filename = file.filename or "temp_audio"
+        tmp = Path(tempfile.gettempdir()) / filename
+        tmp.write_bytes(contents)
+        count = ingest_audio_transcript(tmp, max_authorization_level=max_authorization_level)
+        return IngestResponse(message=f"audio ingested: {count} chunks")
+    except Exception as e:
+        return IngestResponse(message=f"error: {e}")

@@ -8,6 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 export default function Chat() {
   const { messages, input, handleInputChange, handleSubmit, status } = useChat({
     api: `${import.meta.env.VITE_API_URL}/chat`,
+    body: {},
   })
 
   const isLoading = status === 'streaming' || status === 'submitted'
