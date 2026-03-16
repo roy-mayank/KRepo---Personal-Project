@@ -1,8 +1,8 @@
 from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile
 from pydantic import BaseModel
 
-from ..integrations import available, get_integration
-from .ingest import ingest_integration
+from integrations import available, get_integration
+from rag.ingest import ingest_integration
 
 router = APIRouter()
 

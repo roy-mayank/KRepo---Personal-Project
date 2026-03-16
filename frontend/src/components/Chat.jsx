@@ -1,17 +1,28 @@
 import { useChat } from '@ai-sdk/react'
 import { Send } from 'lucide-react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
 export default function Chat() {
-  const { messages, input, handleInputChange, handleSubmit, status } = useChat({
+  // Use status for loading states as per the latest docs
+  const { messages, sendMessage, status } = useChat({
     api: `${import.meta.env.VITE_API_URL}/chat`,
-    body: {},
+    id: 'tempchatUUID',
   })
 
+  const [input, setInput] = useState('')
   const isLoading = status === 'streaming' || status === 'submitted'
+
+  const handleFormSubmit = (e) => {
+    e.preventDefault()
+    if (input.trim() && status === 'ready') {
+      sendMessage({ text: input })
+      setInput('')
+    }
+  }
 
   return (
     <Card className="flex h-full flex-col">
@@ -22,6 +33,7 @@ export default function Chat() {
               Ask me anything about your knowledge base.
             </div>
           )}
+
           {messages.map((message) => (
             <div
               key={message.id}
@@ -34,29 +46,49 @@ export default function Chat() {
                     : 'bg-muted text-foreground'
                 }`}
               >
-                <p className="whitespace-pre-wrap">{message.content}</p>
+                {/* LATEST DOCS RECOMMENDATION: 
+                  Iterate through message.parts instead of using message.content 
+                */}
+                <div className="whitespace-pre-wrap">
+                  {message.parts.map((part, index) => {
+                    if (part.type === 'text') {
+                      return <span key={index}>{part.text}</span>
+                    }
+                    // Handle other types like reasoning if supported by your model
+                    if (part.type === 'reasoning') {
+                      return (
+                        <pre key={index} className="text-xs opacity-70 italic">
+                          {part.text}
+                        </pre>
+                      )
+                    }
+                    return null
+                  })}
+                </div>
               </div>
             </div>
           ))}
-          {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
+
+          {/* Improved Loading indicator using the new status values */}
+          {isLoading && (
             <div className="flex justify-start">
               <div className="rounded-lg bg-muted px-4 py-2.5 text-sm text-muted-foreground italic">
-                Thinking...
+                {status === 'submitted' ? 'Connecting...' : 'Thinking...'}
               </div>
             </div>
           )}
         </div>
       </ScrollArea>
 
-      <form onSubmit={handleSubmit} className="flex gap-2 border-t p-4">
+      <form onSubmit={handleFormSubmit} className="flex gap-2 border-t p-4">
         <Input
-          value={input ?? ''}
-          onChange={handleInputChange}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
           placeholder="Ask a question..."
-          disabled={isLoading}
+          disabled={status !== 'ready'}
           className="flex-1"
         />
-        <Button type="submit" size="icon" disabled={isLoading || !(input ?? '').trim()}>
+        <Button type="submit" size="icon" disabled={status !== 'ready' || !input.trim()}>
           <Send className="h-4 w-4" />
         </Button>
       </form>

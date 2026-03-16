@@ -3,8 +3,8 @@ from fastembed import TextEmbedding  # type: ignore
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from qdrant_client import QdrantClient, models
 
-from ..integrations.base import BaseIntegration, Document
-from ..settings import settings
+from integrations.base import BaseIntegration, Document
+from settings import settings
 
 COLLECTION_NAME = "krepo"
 EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"

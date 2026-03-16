@@ -31,3 +31,8 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+if settings.ANTHROPIC_API_KEY:
+    print(f"DEBUG: API Key loaded (starts with: {settings.ANTHROPIC_API_KEY[:10]}...)")
+else:
+    print("DEBUG: API Key is EMPTY!")
