@@ -42,6 +42,7 @@ class ChatRequest(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     mode: Optional[str] = None
     level: Optional[str] = None
+    task_context: Optional[dict] = None  # manager-defined task for employee onboarding
 
 
 def _build_context(query: str) -> Tuple[str, List[Any]]:
@@ -59,7 +60,7 @@ def _build_context(query: str) -> Tuple[str, List[Any]]:
 
 
 def _to_langchain_messages(
-    messages: list[Message], mode: Optional[str], level: Optional[str]
+    messages: list[Message], mode: Optional[str], level: Optional[str], task_context: Optional[dict] = None
 ) -> Tuple[list[Any], List[Any]]:
     last_user_msg = ""
     for msg in reversed(messages):
@@ -71,8 +72,55 @@ def _to_langchain_messages(
     system_content = SYSTEM_PROMPT
 
     if mode == "onboarding":
-        # Removed trailing whitespace from the end of the lines
-        system_content += """
+        if task_context:
+            title = task_context.get("title", "")
+            description = task_context.get("description", "")
+            skills = ", ".join(task_context.get("required_skills", []))
+            assignee = task_context.get("assignee_name", "the employee")
+            system_content += f"""
+### EMPLOYEE ONBOARDING MODE
+You are assessing {assignee} for the following assigned task:
+- Title: {title}
+- Description: {description}
+- Required Skills: {skills}
+
+Your job:
+1. When the employee begins their assessment, respond ONLY with JSON identifying the key concepts
+   they need to master for this specific task. Ground concepts in the knowledge base context below.
+2. When they provide ratings for those concepts, respond ONLY with a personalized learning_path DAG
+   targeting their knowledge gaps.
+
+JSON for Step 1:
+{{
+  "concepts": [
+    {{ "name": "Concept Name", "level_question": "How familiar are you with X? (0-10)" }}
+  ],
+  "learning_path": {{ "nodes": [] }}
+}}
+
+JSON for Step 2:
+{{
+  "learning_path": {{
+    "nodes": [
+      {{
+        "id": "unique_id",
+        "title": "Topic Title",
+        "description": "What the employee will learn here",
+        "prerequisites": ["other_id"],
+        "xp": 0
+      }}
+    ]
+  }}
+}}
+
+STRICT RULES:
+- Output valid JSON only. No prose or filler text.
+- The graph must be a Directed Acyclic Graph (DAG).
+- For concepts rated >=7 by the employee, start them at advanced nodes (skip foundational ones).
+- For concepts rated <4, include foundational nodes before advanced ones.
+- Keep nodes focused and actionable — each node should represent a learnable unit from the docs."""
+        else:
+            system_content += """
 ### ONBOARDING MODE INSTRUCTIONS
 You are operating in onboarding mode.
 1. If the user describes a task, respond ONLY with a JSON object identifying key concepts.
@@ -90,7 +138,13 @@ JSON Structure for Step 2 (The Graph):
 {
   "learning_path": {
     "nodes": [
-      { "id": "unique_id", "title": "Node Title", "prerequisites": ["other_id"], "xp": 100 }
+      {
+        "id": "unique_id",
+        "title": "Node Title",
+        "description": "What to learn",
+        "prerequisites": ["other_id"],
+        "xp": 0
+      }
     ]
   }
 }
@@ -136,7 +190,7 @@ def load_chat_history(chat_id: str) -> list[dict]:
 async def chat(request: ChatRequest) -> StreamingResponse:
 
     print(f"Received request for chat ID: {request.id}")
-    lc_messages, chunks = _to_langchain_messages(request.messages, request.mode, request.level)
+    lc_messages, chunks = _to_langchain_messages(request.messages, request.mode, request.level, request.task_context)
 
     async def stream_response():
 
