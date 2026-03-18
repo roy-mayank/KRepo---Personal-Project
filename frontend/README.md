@@ -3,6 +3,7 @@
 dev scripts:
 Venv activation (windows): .\venv\Scripts\Activate.ps1
 FASTAPI script: uv run --project backend uvicorn backend.main:app --reload
+or in backend dir: uv run uvicorn main:app --reload
 frontend script: npm run dev
 
 # React + Vite

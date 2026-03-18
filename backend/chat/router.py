@@ -1,3 +1,4 @@
+import asyncio
 import json
 import uuid
 from pathlib import Path
@@ -138,6 +139,11 @@ async def chat(request: ChatRequest) -> StreamingResponse:
     lc_messages, chunks = _to_langchain_messages(request.messages, request.mode, request.level)
 
     async def stream_response():
+
+        for word in "This is a mock response because Anthropic is being difficult.".split():
+            yield f"0:{json.dumps(word + ' ')}\n"
+            await asyncio.sleep(0.1)
+
         full_assistant_content = ""
 
         async for chunk in llm.astream(lc_messages):
