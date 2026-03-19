@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from chat.router import router as chat_router
 from onboarding.router import router as onboarding_router
 from rag.documents import router as documents_router
+from rag.github_router import router as github_router
 from rag.router import router as rag_router
 
 app = FastAPI(title="KRepo API")
@@ -20,6 +21,7 @@ app.include_router(chat_router)
 app.include_router(onboarding_router)
 app.include_router(rag_router)
 app.include_router(documents_router)
+app.include_router(github_router)
 
 
 @app.get("/health")

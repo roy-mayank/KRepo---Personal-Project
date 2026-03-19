@@ -1,0 +1,13 @@
+[
+  {
+    "id": "b24c10ae-c933-43da-a4af-abdd6605f604",
+    "title": "test",
+    "description": "test",
+    "required_skills": [
+      "test"
+    ],
+    "assignee_name": "test",
+    "created_by": "test",
+    "learning_path": null
+  }
+]

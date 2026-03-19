@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Trash2, ArrowLeft, ChevronDown, ChevronUp, GitBranch } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -169,7 +169,7 @@ export default function OnboardingManager({ onBack }) {
               </div>
               {error && <p className="text-xs text-destructive">{error}</p>}
               <Button type="submit" disabled={submitting}>
-                {submitting ? 'Creating...' : 'Create Task'}
+                {submitting ? 'Creating & generating learning path…' : 'Create Task'}
               </Button>
             </form>
           </CardContent>
@@ -201,15 +201,22 @@ export default function OnboardingManager({ onBack }) {
                       </p>
                     )}
                     <p className="mt-1 text-sm text-muted-foreground">{task.description}</p>
-                    {task.required_skills?.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {task.required_skills.map((s) => (
-                          <Badge key={s} variant="secondary" className="text-xs">
-                            {s}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
+                    <div className="mt-2 flex flex-wrap items-center gap-1">
+                      {task.required_skills?.map((s) => (
+                        <Badge key={s} variant="secondary" className="text-xs">
+                          {s}
+                        </Badge>
+                      ))}
+                      {task.learning_path?.nodes?.length > 0 && (
+                        <Badge
+                          variant="outline"
+                          className="text-xs text-indigo-400 border-indigo-400/40 gap-1"
+                        >
+                          <GitBranch className="h-2.5 w-2.5" />
+                          {task.learning_path.nodes.length} learning nodes
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                   <Button
                     variant="ghost"

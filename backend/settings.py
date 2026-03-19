@@ -22,6 +22,15 @@ class Settings(BaseSettings):
     # Linear
     LINEAR_API_KEY: str = ""
 
+    # GitHub
+    GITHUB_TOKEN: str = ""
+    GITHUB_REPOS: str = ""  # comma-separated "owner/repo" pairs, e.g. "myorg/backend,myorg/frontend"
+
+    # Azure DevOps
+    AZURE_DEVOPS_TOKEN: str = ""
+    AZURE_DEVOPS_ORG: str = ""
+    AZURE_DEVOPS_REPOS: str = ""  # comma-separated "project/repo" pairs
+
     # Parsing
     LEMONFOX_API_KEY: str = ""
     LLAMA_CLOUD_API_KEY: str = ""

@@ -1,5 +1,0 @@
-{
-  "permissions": {
-    "allow": ["Bash(uv add:*)", "Bash(uv run:*)", "Bash(npx shadcn@latest:*)"]
-  }
-}
