@@ -3,30 +3,21 @@ repos:
     hooks:
       - id: ruff-format
         name: ruff format
-        entry: ruff format backend
-        language: python
-        additional_dependencies: ["ruff>=0.15.5"]
-        pass_filenames: false
+        entry: uv run --directory backend ruff format
+        language: system
+        types: [python]
         files: ^backend/
 
       - id: ruff-lint
         name: ruff lint
-        entry: ruff check --fix backend
-        language: python
-        additional_dependencies: ["ruff>=0.15.5"]
-        pass_filenames: false
-        files: ^backend/
-
-      - id: basedpyright
-        name: basedpyright
-        entry: bash -c "command -v basedpyright >/dev/null 2>&1 && basedpyright backend || echo 'basedpyright not installed, skipping'"
+        entry: uv run --directory backend ruff check --fix
         language: system
-        pass_filenames: false
+        types: [python]
         files: ^backend/
 
       - id: prettier
         name: prettier
-        entry: npx prettier --write frontend/src
-        language: node
-        pass_filenames: false
+        entry: pnpm --dir frontend exec prettier --write
+        language: system
+        types_or: [ts, tsx, css, json]
         files: ^frontend/src/
