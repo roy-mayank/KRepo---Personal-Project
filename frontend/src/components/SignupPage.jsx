@@ -1,16 +1,71 @@
 import { useState } from 'react'
-import { Github, Eye, EyeOff } from 'lucide-react'
-import { Link } from '@tanstack/react-router'
+import { Github, Eye, EyeOff, Mail } from 'lucide-react'
+import { Link, useNavigate } from '@tanstack/react-router'
+import {
+  signInWithPopup,
+  createUserWithEmailAndPassword,
+  GoogleAuthProvider,
+  GithubAuthProvider,
+} from 'firebase/auth'
+import { auth } from '@/lib/firebase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
-export default function SignupPage() {
-  const [showPass, setShowPass] = useState(false)
-  const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' })
+const googleProvider = new GoogleAuthProvider()
+const githubProvider = new GithubAuthProvider()
 
-  const handleSubmit = (e) => {
+export default function SignupPage() {
+  const navigate = useNavigate()
+  const [showPass, setShowPass] = useState(false)
+  const [form, setForm] = useState({ email: '', password: '', confirm: '' })
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const handleSuccess = () => {
+    navigate({ to: '/dashboard' })
+  }
+
+  const handleOAuth = async (provider) => {
+    setError('')
+    setLoading(true)
+    try {
+      await signInWithPopup(auth, provider)
+      handleSuccess()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleEmailSignup = async (e) => {
     e.preventDefault()
-    // dummy – no real auth
+    setError('')
+
+    if (form.password !== form.confirm) {
+      setError('Passwords do not match')
+      return
+    }
+    if (form.password.length < 6) {
+      setError('Password must be at least 6 characters')
+      return
+    }
+
+    setLoading(true)
+    try {
+      await createUserWithEmailAndPassword(auth, form.email, form.password)
+      handleSuccess()
+    } catch (err) {
+      if (err.code === 'auth/email-already-in-use') {
+        setError('An account with this email already exists')
+      } else if (err.code === 'auth/weak-password') {
+        setError('Password is too weak')
+      } else {
+        setError(err.message)
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -27,15 +82,34 @@ export default function SignupPage() {
           <p className="text-gray-500 text-sm mt-2">Create your account</p>
         </div>
 
-        {/* OAuth */}
-        <Button
-          variant="outline"
-          className="w-full border-gray-700 text-gray-300 hover:text-white hover:border-gray-600 mb-4"
-          onClick={() => {}}
-        >
-          <Github className="h-4 w-4 mr-2" />
-          Continue with GitHub
-        </Button>
+        {/* Error */}
+        {error && (
+          <div className="mb-4 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2 text-xs text-red-400">
+            {error}
+          </div>
+        )}
+
+        {/* OAuth providers */}
+        <div className="flex flex-col gap-2 mb-4">
+          <Button
+            variant="outline"
+            className="w-full border-gray-700 text-gray-300 hover:text-white hover:border-gray-600"
+            onClick={() => handleOAuth(googleProvider)}
+            disabled={loading}
+          >
+            <Mail className="h-4 w-4 mr-2" />
+            Continue with Google
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full border-gray-700 text-gray-300 hover:text-white hover:border-gray-600"
+            onClick={() => handleOAuth(githubProvider)}
+            disabled={loading}
+          >
+            <Github className="h-4 w-4 mr-2" />
+            Continue with GitHub
+          </Button>
+        </div>
 
         <div className="flex items-center gap-3 mb-4">
           <div className="flex-1 h-px bg-gray-800" />
@@ -43,19 +117,8 @@ export default function SignupPage() {
           <div className="flex-1 h-px bg-gray-800" />
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Full Name</label>
-            <Input
-              type="text"
-              placeholder="Jane Smith"
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              autoComplete="name"
-            />
-          </div>
-
+        {/* Email/password form */}
+        <form onSubmit={handleEmailSignup} className="flex flex-col gap-3">
           <div>
             <label className="block text-xs text-gray-500 mb-1">Email</label>
             <Input
@@ -102,8 +165,9 @@ export default function SignupPage() {
           <Button
             type="submit"
             className="w-full mt-1 bg-blue-600 hover:bg-blue-500 text-white border-0"
+            disabled={loading}
           >
-            Create Account
+            {loading ? 'Creating account...' : 'Create Account'}
           </Button>
         </form>
 

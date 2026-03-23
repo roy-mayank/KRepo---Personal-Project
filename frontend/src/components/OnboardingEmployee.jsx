@@ -233,7 +233,7 @@ export default function OnboardingEmployee({ onBack }) {
   useEffect(() => {
     fetch(`${API}/onboarding/tasks`)
       .then((r) => r.json())
-      .then(setTasks)
+      .then((data) => setTasks(Array.isArray(data) ? data : []))
       .catch(() => setError('Could not load tasks. Is the backend running?'))
       .finally(() => setLoading(false))
   }, [])

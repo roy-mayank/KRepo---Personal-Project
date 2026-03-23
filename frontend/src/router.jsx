@@ -26,32 +26,35 @@ const rootRoute = createRootRoute({
   ),
 })
 
-// Landing
+// Public routes
 const landingRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   component: LandingPage,
 })
 
-// Login
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/login',
   component: LoginPage,
 })
 
-// Signup
 const signupRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/signup',
   component: SignupPage,
 })
 
-// Dashboard layout
+// Dashboard layout — auth guard here protects all children
 const dashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/dashboard',
   component: DashboardLayout,
+  beforeLoad: ({ context }) => {
+    if (!context.auth.user) {
+      throw redirect({ to: '/login' })
+    }
+  },
 })
 
 // Dashboard children
@@ -125,4 +128,7 @@ const routeTree = rootRoute.addChildren([
   ]),
 ])
 
-export const router = createRouter({ routeTree })
+export const router = createRouter({
+  routeTree,
+  context: { auth: undefined },
+})

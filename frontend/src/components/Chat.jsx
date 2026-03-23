@@ -25,7 +25,7 @@ export default function Chat() {
   }
 
   return (
-    <Card className="flex h-full flex-col">
+    <Card className="flex h-full flex-col rounded-none">
       <ScrollArea className="flex-1 p-4">
         <div className="flex flex-col gap-3">
           {messages.length === 0 && (

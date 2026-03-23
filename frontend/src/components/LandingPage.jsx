@@ -1,6 +1,6 @@
-import { LogIn, UserPlus, Github } from 'lucide-react'
+import { LogIn, UserPlus } from 'lucide-react'
 import { useNavigate, Link } from '@tanstack/react-router'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 function DatabaseCylinder() {
@@ -150,10 +150,6 @@ export default function LandingPage() {
           <UserPlus className="h-3.5 w-3.5 mr-1.5" />
           Sign Up
         </Link>
-        <Button size="sm" className="bg-blue-600 hover:bg-blue-500 text-white border-0">
-          <Github className="h-3.5 w-3.5 mr-1.5" />
-          OAuth
-        </Button>
       </div>
 
       {/* Brand title – top center */}
