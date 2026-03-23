@@ -17,7 +17,10 @@ import DocumentUpload from '@/components/DocumentUpload'
 import IntegrationsPage from '@/components/IntegrationsPage'
 import TasksPage from '@/components/TasksPage'
 import OnboardingEmployee from '@/components/OnboardingEmployee'
-import SettingsPage from '@/components/SettingsPage'
+import SettingsLayout from '@/components/settings/SettingsLayout'
+import AccountPage from '@/components/settings/AccountPage'
+import MembersPage from '@/components/settings/MembersPage'
+import PricingPage from '@/components/settings/PricingPage'
 
 export interface AuthContext {
   user: User | null
@@ -144,7 +147,33 @@ const onboardingRoute = createRoute({
 const settingsRoute = createRoute({
   getParentRoute: () => dashboardRoute,
   path: '/settings',
-  component: SettingsPage,
+  component: SettingsLayout,
+})
+
+const settingsIndexRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: '/',
+  beforeLoad: () => {
+    throw redirect({ to: '/dashboard/settings/account' })
+  },
+})
+
+const settingsAccountRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: '/account',
+  component: AccountPage,
+})
+
+const settingsMembersRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: '/members',
+  component: MembersPage,
+})
+
+const settingsPricingRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: '/pricing',
+  component: PricingPage,
 })
 
 // Build route tree
@@ -160,7 +189,12 @@ const routeTree = rootRoute.addChildren([
     integrationsRoute,
     tasksRoute,
     onboardingRoute,
-    settingsRoute,
+    settingsRoute.addChildren([
+      settingsIndexRoute,
+      settingsAccountRoute,
+      settingsMembersRoute,
+      settingsPricingRoute,
+    ]),
   ]),
 ])
 

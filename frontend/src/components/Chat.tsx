@@ -1,5 +1,5 @@
 import { MessageSquarePlus, Send, Trash2 } from 'lucide-react'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -38,6 +38,12 @@ export default function Chat(): React.JSX.Element {
   const [input, setInput] = useState('')
   const [status, setStatus] = useState<Status>('ready')
   const abortRef = useRef<AbortController | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // Auto-focus input on mount
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [])
 
   // Sidebar: list of conversations
   const { data: conversations = [] } = useQuery<ConversationSummary[]>({
@@ -245,6 +251,7 @@ export default function Chat(): React.JSX.Element {
 
         <form onSubmit={handleSubmit} className="flex gap-2 border-t p-4">
           <Input
+            ref={inputRef}
             value={input}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInput(e.target.value)}
             placeholder="Ask a question..."
