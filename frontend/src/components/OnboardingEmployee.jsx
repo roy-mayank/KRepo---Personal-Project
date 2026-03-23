@@ -245,9 +245,11 @@ export default function OnboardingEmployee({ onBack }) {
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto p-4">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={onBack}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
+        {onBack && (
+          <Button variant="ghost" size="icon" onClick={onBack}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+        )}
         <h2 className="text-lg font-semibold">My Onboarding Tasks</h2>
       </div>
 

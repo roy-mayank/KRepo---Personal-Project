@@ -1,36 +1,36 @@
 import { useState } from 'react'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import Chat from '@/components/Chat'
-import DocumentUpload from '@/components/DocumentUpload'
-import Onboarding from '@/components/Onboarding'
+import LandingPage from '@/components/LandingPage'
+import MainApp from '@/components/MainApp'
 
 function App() {
+  const [phase, setPhase] = useState('landing') // 'landing' | 'animating' | 'app'
+
+  const handleLaunch = () => {
+    setPhase('animating')
+    setTimeout(() => setPhase('app'), 820)
+  }
+
   return (
-    <div className="dark flex h-screen w-full items-center justify-center bg-background p-4">
-      <div className="flex h-full w-full max-w-3xl flex-col">
-        <Tabs defaultValue="chat" className="flex h-full flex-col">
-          <TabsList className="w-full">
-            <TabsTrigger value="chat" className="flex-1">
-              Chat
-            </TabsTrigger>
-            <TabsTrigger value="documents" className="flex-1">
-              Documents
-            </TabsTrigger>
-            <TabsTrigger value="onboarding" className="flex-1">
-              Onboarding
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="chat" className="flex-1 overflow-hidden">
-            <Chat />
-          </TabsContent>
-          <TabsContent value="documents" className="flex-1 overflow-hidden">
-            <DocumentUpload />
-          </TabsContent>
-          <TabsContent value="onboarding" className="flex-1 overflow-hidden">
-            <Onboarding />
-          </TabsContent>
-        </Tabs>
+    <div className="h-screen overflow-hidden bg-black">
+      {/* Main app is always mounted underneath */}
+      <div className="dark h-full">
+        <MainApp />
       </div>
+
+      {/* Landing page overlays as a fixed layer, slides up on click */}
+      {phase !== 'app' && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 50,
+            transform: phase === 'animating' ? 'translateY(-100vh)' : 'translateY(0)',
+            transition: 'transform 0.82s cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
+        >
+          <LandingPage onLaunch={handleLaunch} />
+        </div>
+      )}
     </div>
   )
 }
