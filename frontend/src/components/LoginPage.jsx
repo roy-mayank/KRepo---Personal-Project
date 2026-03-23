@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Github, Eye, EyeOff } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
-export default function LoginPage({ onNavigate }) {
+export default function LoginPage() {
   const [showPass, setShowPass] = useState(false)
   const [form, setForm] = useState({ email: '', password: '' })
 
@@ -95,12 +96,9 @@ export default function LoginPage({ onNavigate }) {
 
         <p className="text-center text-xs text-gray-600 mt-6">
           Don't have an account?{' '}
-          <button
-            className="text-blue-500 hover:text-blue-400"
-            onClick={() => onNavigate('signup')}
-          >
+          <Link to="/signup" className="text-blue-500 hover:text-blue-400">
             Sign up
-          </button>
+          </Link>
         </p>
       </div>
     </div>

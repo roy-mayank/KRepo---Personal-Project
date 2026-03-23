@@ -1,5 +1,7 @@
 import { LogIn, UserPlus, Github } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { useNavigate, Link } from '@tanstack/react-router'
+import { Button, buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 function DatabaseCylinder() {
   const W = 300
@@ -115,29 +117,39 @@ function DatabaseCylinder() {
   )
 }
 
-export default function LandingPage({ onLaunch }) {
+export default function LandingPage() {
+  const navigate = useNavigate()
+
+  const handleLaunch = () => {
+    navigate({ to: '/dashboard' })
+  }
+
   return (
     <div
       className="relative w-screen h-screen bg-black overflow-hidden cursor-pointer select-none"
-      onClick={onLaunch}
+      onClick={handleLaunch}
     >
       <div className="absolute top-5 right-6 flex gap-2 z-20" onClick={(e) => e.stopPropagation()}>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-gray-400 hover:text-white border border-gray-800 hover:border-blue-500 transition-colors"
+        <Link
+          to="/login"
+          className={cn(
+            buttonVariants({ variant: 'ghost', size: 'sm' }),
+            'text-gray-400 hover:text-white border border-gray-800 hover:border-blue-500 transition-colors',
+          )}
         >
           <LogIn className="h-3.5 w-3.5 mr-1.5" />
           Log In
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-gray-400 hover:text-white border border-gray-800 hover:border-blue-500 transition-colors"
+        </Link>
+        <Link
+          to="/signup"
+          className={cn(
+            buttonVariants({ variant: 'ghost', size: 'sm' }),
+            'text-gray-400 hover:text-white border border-gray-800 hover:border-blue-500 transition-colors',
+          )}
         >
           <UserPlus className="h-3.5 w-3.5 mr-1.5" />
           Sign Up
-        </Button>
+        </Link>
         <Button size="sm" className="bg-blue-600 hover:bg-blue-500 text-white border-0">
           <Github className="h-3.5 w-3.5 mr-1.5" />
           OAuth
