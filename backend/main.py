@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from auth.firebase import init_firebase
 from auth.router import router as auth_router
 from chat.router import router as chat_router
 from db import create_all_tables
@@ -14,6 +15,7 @@ from rag.router import router as rag_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    init_firebase()
     await create_all_tables()
     yield
 

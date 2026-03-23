@@ -7,19 +7,10 @@ from auth.models import Role
 
 class TenantRegister(BaseModel):
     tenant_name: str
-    admin_email: str
-    admin_password: str
+    firebase_id_token: str
 
 
-class LoginRequest(BaseModel):
-    email: str
-    password: str
-    tenant_slug: str
-
-
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
+class RegisterResponse(BaseModel):
     tenant_slug: str
 
 
@@ -37,7 +28,11 @@ class InviteResponse(BaseModel):
 
 class AcceptInviteRequest(BaseModel):
     token: str
-    password: str
+    firebase_id_token: str
+
+
+class AcceptInviteResponse(BaseModel):
+    tenant_slug: str
 
 
 class UserResponse(BaseModel):

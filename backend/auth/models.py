@@ -42,6 +42,7 @@ class User(Base):
     __table_args__ = (
         # Same email can exist across tenants; unique only within a tenant
         UniqueConstraint("tenant_id", "email", name="uq_user_tenant_email"),
+        UniqueConstraint("tenant_id", "firebase_uid", name="uq_user_tenant_firebase_uid"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -49,7 +50,7 @@ class User(Base):
         UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True
     )
     email: Mapped[str] = mapped_column(String(255), nullable=False)
-    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    firebase_uid: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     role: Mapped[Role] = mapped_column(SAEnum(Role), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

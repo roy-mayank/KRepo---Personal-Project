@@ -1,14 +1,13 @@
-import uuid
 from collections.abc import AsyncGenerator
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import selectinload
 
-from auth.jwt import decode_token
-from auth.models import Role, User
+from auth.firebase import verify_firebase_token
+from auth.models import Role, Tenant, User
 from db import get_db
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
@@ -16,6 +15,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
+    x_tenant_slug: str = Header(..., alias="X-Tenant-Slug"),
     db: AsyncSession = Depends(get_db),
 ) -> User:
     credentials_error = HTTPException(
@@ -24,16 +24,24 @@ async def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = decode_token(token)
-    except ValueError:
+        decoded = verify_firebase_token(token)
+    except Exception:
         raise credentials_error
 
-    user_id: str | None = payload.get("sub")
-    if not user_id:
+    firebase_uid: str | None = decoded.get("uid")
+    if not firebase_uid:
         raise credentials_error
 
     result = await db.execute(
-        select(User).options(selectinload(User.tenant)).where(User.id == uuid.UUID(user_id), User.is_active == True)  # noqa: E712
+        select(User)
+        .options(selectinload(User.tenant))
+        .join(Tenant)
+        .where(
+            User.firebase_uid == firebase_uid,
+            Tenant.slug == x_tenant_slug,
+            User.is_active == True,  # noqa: E712
+            Tenant.is_active == True,  # noqa: E712
+        )
     )
     user = result.scalar_one_or_none()
     if not user:
@@ -56,16 +64,8 @@ def require_role(*roles: Role):
     return checker
 
 
-# ─── SOC2 MIGRATION HOOK ────────────────────────────────────────────────────
-# Currently all tenants share the same Postgres instance (tenant_id row filter).
-# To migrate a tenant to a fully dedicated database (required for SOC2 silo model):
-#   1. Provision a dedicated Postgres instance (e.g. separate RDS on its own EC2)
-#   2. Run `alembic upgrade head` against the new DB
-#   3. Migrate the tenant's existing data (pg_dump/restore or a custom script)
-#   4. Set Tenant.db_url to the new connection string in the control-plane DB
-#   5. This dependency will automatically start routing that tenant's requests
-#      to the dedicated DB — no application code changes needed elsewhere.
-# ─────────────────────────────────────────────────────────────────────────────
+# --- SOC2 MIGRATION HOOK ---
+# See auth/models.py Tenant.db_url for migration steps.
 async def get_tenant_db(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

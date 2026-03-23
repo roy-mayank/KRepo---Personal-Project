@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = ""
 
     # Auth
-    JWT_SECRET: str = ""
+    FIREBASE_SERVICE_ACCOUNT: str = ""  # base64-encoded service account JSON
     INVITE_TOKEN_EXPIRE_HOURS: int = 72
 
 

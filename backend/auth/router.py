@@ -2,48 +2,46 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth.dependencies import get_current_user, require_role
-from auth.jwt import create_access_token
+from auth.firebase import verify_firebase_token
 from auth.models import Invitation, Role, Tenant, User
 from auth.schemas import (
     AcceptInviteRequest,
+    AcceptInviteResponse,
     InviteRequest,
     InviteResponse,
-    LoginRequest,
+    RegisterResponse,
     TenantRegister,
     TenantResponse,
-    TokenResponse,
     UserResponse,
 )
 from db import get_db
 from settings import settings
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-
-def _hash_password(password: str) -> str:
-    return pwd_context.hash(password)
-
-
-def _verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
 
 
 def _slugify(name: str) -> str:
     return name.lower().strip().replace(" ", "-").replace("_", "-")
 
 
-@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-async def register(body: TenantRegister, db: AsyncSession = Depends(get_db)) -> TokenResponse:
+@router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
+async def register(body: TenantRegister, db: AsyncSession = Depends(get_db)) -> RegisterResponse:
     """Create a new tenant and its first admin user.
 
-    Only one admin per tenant can be created this way. All other users must be invited.
+    The caller must have already signed up via Firebase.
+    Pass the Firebase ID token; the backend extracts uid and email.
     """
+    try:
+        decoded = verify_firebase_token(body.firebase_id_token)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid Firebase token")
+
+    firebase_uid = decoded["uid"]
+    email = decoded.get("email", "")
     slug = _slugify(body.tenant_name)
 
     existing = await db.execute(select(Tenant).where(Tenant.slug == slug))
@@ -52,50 +50,74 @@ async def register(body: TenantRegister, db: AsyncSession = Depends(get_db)) -> 
 
     tenant = Tenant(name=body.tenant_name, slug=slug)
     db.add(tenant)
-    await db.flush()  # populate tenant.id before referencing it
+    await db.flush()
 
     user = User(
         tenant_id=tenant.id,
-        email=body.admin_email,
-        hashed_password=_hash_password(body.admin_password),
+        email=email,
+        firebase_uid=firebase_uid,
         role=Role.admin,
     )
     db.add(user)
     await db.commit()
-    await db.refresh(user)
 
-    return TokenResponse(
-        access_token=create_access_token(str(user.id), str(tenant.id), user.role.value, slug),
-        tenant_slug=slug,
-    )
+    return RegisterResponse(tenant_slug=slug)
 
 
-@router.post("/token", response_model=TokenResponse)
-async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)) -> TokenResponse:
-    """Login with email + password + tenant_slug. Returns a JWT bearer token."""
-    result = await db.execute(
-        select(User)
-        .join(Tenant, User.tenant_id == Tenant.id)
-        .where(
-            User.email == body.email,
-            User.is_active == True,  # noqa: E712
-            Tenant.slug == body.tenant_slug,
-            Tenant.is_active == True,  # noqa: E712
+@router.post("/accept-invite", response_model=AcceptInviteResponse, status_code=status.HTTP_201_CREATED)
+async def accept_invite(body: AcceptInviteRequest, db: AsyncSession = Depends(get_db)) -> AcceptInviteResponse:
+    """Accept an invitation token and create a user account.
+
+    The caller must have already signed up via Firebase.
+    """
+    try:
+        decoded = verify_firebase_token(body.firebase_id_token)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid Firebase token")
+
+    firebase_uid = decoded["uid"]
+    email = decoded.get("email", "")
+
+    result = await db.execute(select(Invitation).where(Invitation.token == body.token))
+    invitation = result.scalar_one_or_none()
+
+    if not invitation:
+        raise HTTPException(status_code=404, detail="Invalid invitation token")
+    if invitation.accepted_at is not None:
+        raise HTTPException(status_code=410, detail="Invitation has already been used")
+
+    expires = invitation.expires_at
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    if expires < datetime.now(timezone.utc):
+        raise HTTPException(status_code=410, detail="Invitation has expired")
+
+    if email and email != invitation.email:
+        raise HTTPException(status_code=400, detail="Firebase email does not match the invitation email")
+
+    existing = await db.execute(
+        select(User).where(
+            User.tenant_id == invitation.tenant_id,
+            User.firebase_uid == firebase_uid,
         )
     )
-    user = result.scalar_one_or_none()
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="An account already exists for this user")
 
-    if not user or not _verify_password(body.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email, password, or tenant",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    tenant_result = await db.execute(select(Tenant).where(Tenant.id == invitation.tenant_id))
+    tenant = tenant_result.scalar_one()
 
-    return TokenResponse(
-        access_token=create_access_token(str(user.id), str(user.tenant_id), user.role.value, body.tenant_slug),
-        tenant_slug=body.tenant_slug,
+    user = User(
+        tenant_id=invitation.tenant_id,
+        email=email or invitation.email,
+        firebase_uid=firebase_uid,
+        role=invitation.role,
     )
+    db.add(user)
+    invitation.accepted_at = datetime.now(timezone.utc)
+    await db.commit()
+
+    return AcceptInviteResponse(tenant_slug=tenant.slug)
 
 
 @router.post("/invite", response_model=InviteResponse)
@@ -105,7 +127,6 @@ async def invite_user(
     db: AsyncSession = Depends(get_db),
 ) -> InviteResponse:
     """Admin-only: generate an invitation link/token for a new user."""
-    # Block re-inviting existing active users
     existing_user = await db.execute(
         select(User).where(
             User.tenant_id == current_user.tenant_id,
@@ -116,7 +137,6 @@ async def invite_user(
     if existing_user.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="A user with this email already exists in your organisation")
 
-    # Block duplicate pending invitations
     pending = await db.execute(
         select(Invitation).where(
             Invitation.tenant_id == current_user.tenant_id,
@@ -146,54 +166,6 @@ async def invite_user(
         email=body.email,
         role=body.role,
         expires_in_hours=settings.INVITE_TOKEN_EXPIRE_HOURS,
-    )
-
-
-@router.post("/accept-invite", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-async def accept_invite(body: AcceptInviteRequest, db: AsyncSession = Depends(get_db)) -> TokenResponse:
-    """Accept an invitation token and create a user account."""
-    result = await db.execute(select(Invitation).where(Invitation.token == body.token))
-    invitation = result.scalar_one_or_none()
-
-    if not invitation:
-        raise HTTPException(status_code=404, detail="Invalid invitation token")
-    if invitation.accepted_at is not None:
-        raise HTTPException(status_code=410, detail="Invitation has already been used")
-
-    expires = invitation.expires_at
-    if expires.tzinfo is None:
-        expires = expires.replace(tzinfo=timezone.utc)
-    if expires < datetime.now(timezone.utc):
-        raise HTTPException(status_code=410, detail="Invitation has expired")
-
-    # Guard against race conditions
-    existing = await db.execute(
-        select(User).where(
-            User.tenant_id == invitation.tenant_id,
-            User.email == invitation.email,
-        )
-    )
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail="An account with this email already exists")
-
-    # Fetch tenant slug for the token
-    tenant_result = await db.execute(select(Tenant).where(Tenant.id == invitation.tenant_id))
-    tenant = tenant_result.scalar_one()
-
-    user = User(
-        tenant_id=invitation.tenant_id,
-        email=invitation.email,
-        hashed_password=_hash_password(body.password),
-        role=invitation.role,
-    )
-    db.add(user)
-    invitation.accepted_at = datetime.now(timezone.utc)
-    await db.commit()
-    await db.refresh(user)
-
-    return TokenResponse(
-        access_token=create_access_token(str(user.id), str(user.tenant_id), user.role.value, tenant.slug),
-        tenant_slug=tenant.slug,
     )
 
 
