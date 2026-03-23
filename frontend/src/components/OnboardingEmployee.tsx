@@ -1,7 +1,7 @@
-import { useState, useEffect, type FormEvent } from 'react'
-import { useChat } from '@ai-sdk/react'
-import { DefaultChatTransport } from 'ai'
+import { useState, useEffect, useCallback, useRef, type FormEvent } from 'react'
 import { ArrowLeft, BookOpen, ChevronDown, ChevronUp } from 'lucide-react'
+import { API_URL } from '@/lib/api'
+import { auth } from '@/lib/firebase'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -9,9 +9,13 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import SkillTree from './SkillTree'
 import { useTasks, type Task, type LearningPath } from '@/lib/queries'
 
-const API: string = import.meta.env.VITE_API_URL
-
 // ── Types ────────────────────────────────────────────────────────────────────
+
+interface ChatMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+}
 
 interface Concept {
   name: string
@@ -39,44 +43,104 @@ interface OnboardingEmployeeProps {
   onBack?: () => void
 }
 
-/** Extract concatenated text from a UIMessage's parts array. */
-function getMessageText(msg: { parts: Array<{ type: string; text?: string }> }): string {
-  return msg.parts
-    .filter(
-      (p): p is { type: 'text'; text: string } => p.type === 'text' && typeof p.text === 'string',
-    )
-    .map((p) => p.text)
-    .join('')
+// ── Streaming chat hook (onboarding mode) ────────────────────────────────────
+
+function useOnboardingChat(task: Task) {
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const messagesRef = useRef<ChatMessage[]>([])
+
+  // Keep ref in sync for use in sendMessage closure
+  useEffect(() => {
+    messagesRef.current = messages
+  }, [messages])
+
+  const sendMessage = useCallback(
+    async (text: string) => {
+      if (isLoading) return
+
+      const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: text }
+      const assistantMsg: ChatMessage = { id: crypto.randomUUID(), role: 'assistant', content: '' }
+
+      const updated = [...messagesRef.current, userMsg]
+      setMessages([...updated, assistantMsg])
+      setIsLoading(true)
+
+      try {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+        const user = auth.currentUser
+        if (user) headers['Authorization'] = `Bearer ${await user.getIdToken()}`
+        const slug = localStorage.getItem('krepo_tenant_slug')
+        if (slug) headers['X-Tenant-Slug'] = slug
+
+        const res = await fetch(`${API_URL}/chat`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            messages: updated.map((m) => ({ role: m.role, content: m.content })),
+            mode: 'onboarding',
+            task_context: task,
+          }),
+        })
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(err.detail || `Request failed (${res.status})`)
+        }
+
+        const reader = res.body?.getReader()
+        const decoder = new TextDecoder()
+
+        if (reader) {
+          let accumulated = ''
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            accumulated += decoder.decode(value, { stream: true })
+            const snapshot = accumulated
+            setMessages((prev) => {
+              const copy = [...prev]
+              copy[copy.length - 1] = { ...copy[copy.length - 1], content: snapshot }
+              return copy
+            })
+          }
+        }
+      } catch (err) {
+        setMessages((prev) => {
+          const copy = [...prev]
+          copy[copy.length - 1] = {
+            ...copy[copy.length - 1],
+            content: `Error: ${(err as Error).message}`,
+          }
+          return copy
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [isLoading, task],
+  )
+
+  return { messages, sendMessage, isLoading }
 }
 
 // ── Learning session ─────────────────────────────────────────────────────────
+
 function LearningSession({ task, onBack }: LearningSessionProps) {
-  // Use pre-generated path if available; chat assessment can replace it
   const [learningPath, setLearningPath] = useState<LearningPath | null>(task.learning_path || null)
   const [concepts, setConcepts] = useState<Concept[] | null>(null)
-  const [ratings, setRatings] = useState<Record<string, number>>({})
-  const [_assessing, setAssessing] = useState(!task.learning_path) // skip if path exists
-  const [chatOpen, setChatOpen] = useState(!task.learning_path) // show chat if no path
+  const [_assessing, setAssessing] = useState(!task.learning_path)
+  const [chatOpen, setChatOpen] = useState(!task.learning_path)
 
-  const { messages, sendMessage, status } = useChat({
-    transport: new DefaultChatTransport({
-      api: `${API}/chat`,
-      body: { mode: 'onboarding', task_context: task },
-    }),
-  })
+  const { messages, sendMessage, isLoading } = useOnboardingChat(task)
 
-  const isLoading = status === 'streaming' || status === 'submitted'
-
-  // Parse assistant JSON -- update path or concepts when received
+  // Parse assistant JSON — update path or concepts when received
   useEffect(() => {
     if (messages.length === 0) return
     const last = messages[messages.length - 1]
-    if (last.role !== 'assistant') return
+    if (last.role !== 'assistant' || !last.content) return
     try {
-      const text = getMessageText(
-        last as unknown as { parts: Array<{ type: string; text?: string }> },
-      )
-      const obj = JSON.parse(text) as Record<string, unknown>
+      const obj = JSON.parse(last.content) as Record<string, unknown>
       if (Array.isArray((obj as unknown as AssessmentConceptsMessage).concepts)) {
         setConcepts((obj as unknown as AssessmentConceptsMessage).concepts)
         setRatings({})
@@ -91,23 +155,41 @@ function LearningSession({ task, onBack }: LearningSessionProps) {
         setConcepts(null)
       }
     } catch {
-      /* non-JSON message -- fine */
+      /* non-JSON or partial stream — fine */
     }
   }, [messages])
 
+  const [ratings, setRatings] = useState<Record<string, number>>({})
+
   const beginAssessment = () => {
     setAssessing(true)
-    sendMessage({
-      text: `I am ready to begin my assessment for the task: "${task.title}". Please assess my knowledge.`,
-    })
+    sendMessage(
+      `I am ready to begin my assessment for the task: "${task.title}". Please assess my knowledge.`,
+    )
   }
 
   const submitRatings = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const payload: RatingsPayload = { ratings }
-    sendMessage({ text: JSON.stringify(payload) })
+    sendMessage(JSON.stringify(payload))
     setConcepts(null)
     setRatings({})
+  }
+
+  /** Display-friendly text for a message. */
+  const displayText = (msg: ChatMessage): string => {
+    try {
+      const obj = JSON.parse(msg.content) as Record<string, unknown>
+      if (msg.role === 'user' && (obj as unknown as RatingsPayload).ratings)
+        return `Submitted ratings for ${Object.keys((obj as unknown as RatingsPayload).ratings).length} concept(s).`
+      if (msg.role === 'assistant' && (obj as unknown as AssessmentConceptsMessage).concepts)
+        return 'Knowledge assessment ready — see form above.'
+      if (msg.role === 'assistant' && (obj as unknown as AssessmentPathMessage).learning_path)
+        return 'Personalised path generated — see skill tree above.'
+    } catch {
+      /* not JSON */
+    }
+    return msg.content
   }
 
   return (
@@ -212,57 +294,17 @@ function LearningSession({ task, onBack }: LearningSessionProps) {
                     className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
                     <div
-                      className={`max-w-[85%] rounded-lg px-3 py-2 text-xs ${
+                      className={`max-w-[85%] rounded-lg px-3 py-2 text-xs whitespace-pre-wrap ${
                         msg.role === 'user'
                           ? 'bg-primary text-primary-foreground'
                           : 'bg-muted text-foreground'
                       }`}
                     >
-                      {msg.role === 'assistant' &&
-                        (() => {
-                          const msgText = getMessageText(
-                            msg as unknown as { parts: Array<{ type: string; text?: string }> },
-                          )
-                          try {
-                            const obj = JSON.parse(msgText) as Record<string, unknown>
-                            if ((obj as unknown as AssessmentConceptsMessage).concepts)
-                              return (
-                                <p className="italic">
-                                  Knowledge assessment ready -- see form above.
-                                </p>
-                              )
-                            if ((obj as unknown as AssessmentPathMessage).learning_path)
-                              return (
-                                <p className="italic">
-                                  Personalised path generated -- see skill tree above.
-                                </p>
-                              )
-                          } catch {
-                            /* fall through */
-                          }
-                          return <p className="whitespace-pre-wrap">{msgText}</p>
-                        })()}
-                      {msg.role === 'user' && (
-                        <p className="whitespace-pre-wrap">
-                          {(() => {
-                            const msgText = getMessageText(
-                              msg as unknown as { parts: Array<{ type: string; text?: string }> },
-                            )
-                            try {
-                              const obj = JSON.parse(msgText) as Record<string, unknown>
-                              if ((obj as unknown as RatingsPayload).ratings)
-                                return `Submitted ratings for ${Object.keys((obj as unknown as RatingsPayload).ratings).length} concept(s).`
-                            } catch {
-                              /* fall through */
-                            }
-                            return msgText
-                          })()}
-                        </p>
-                      )}
+                      {displayText(msg)}
                     </div>
                   </div>
                 ))}
-                {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
+                {isLoading && messages[messages.length - 1]?.content === '' && (
                   <div className="flex justify-start">
                     <div className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground italic">
                       Thinking...
@@ -279,6 +321,7 @@ function LearningSession({ task, onBack }: LearningSessionProps) {
 }
 
 // ── Task picker ──────────────────────────────────────────────────────────────
+
 export default function OnboardingEmployee({ onBack }: OnboardingEmployeeProps) {
   const { data: tasks = [], isLoading: loading, error: queryError } = useTasks()
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)

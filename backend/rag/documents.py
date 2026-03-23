@@ -4,12 +4,14 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from pydantic import BaseModel
 from pypdf import PdfReader
-from qdrant_client.models import FieldCondition, Filter, MatchValue
+from sqlalchemy import delete, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth.dependencies import get_current_user, require_role
 from auth.models import Role, User
+from db import get_db
 from integrations.base import Document
-from rag.ingest import COLLECTION_NAME, _ingest_document, ensure_collection, get_embedding_model, get_qdrant_client
+from rag.ingest import ingest_document
 
 router = APIRouter(prefix="/documents")
 
@@ -42,6 +44,7 @@ SUPPORTED_EXTENSIONS = {".txt", ".md", ".pdf", ".csv", ".json"}
 async def upload_document(
     file: UploadFile,
     current_user: User = Depends(require_role(Role.admin, Role.member)),
+    db: AsyncSession = Depends(get_db),
 ) -> UploadResponse:
     filename = file.filename or "untitled"
     ext = _get_extension(filename)
@@ -74,10 +77,7 @@ async def upload_document(
         metadata={"filename": filename, "file_type": ext},
     )
 
-    client = get_qdrant_client()
-    embedder = get_embedding_model()
-    ensure_collection(client)
-    count = _ingest_document(client, embedder, doc, tenant_id)
+    count = await ingest_document(db, doc, tenant_id)
 
     return UploadResponse(filename=filename, chunks_ingested=count, source_id=source_id)
 
@@ -85,52 +85,46 @@ async def upload_document(
 @router.get("/")
 async def list_documents(
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> DocumentListResponse:
-    tenant_id = str(current_user.tenant_id)
-    client = get_qdrant_client()
-    ensure_collection(client)
+    from rag.models import DocumentChunk
 
-    results = client.scroll(
-        collection_name=COLLECTION_NAME,
-        scroll_filter=Filter(must=[FieldCondition(key="tenant_id", match=MatchValue(value=tenant_id))]),
-        limit=1000,
-        with_payload=True,
-        with_vectors=False,
+    tenant_id = str(current_user.tenant_id)
+
+    result = await db.execute(
+        select(
+            DocumentChunk.source_id,
+            DocumentChunk.title,
+            DocumentChunk.source,
+        )
+        .where(DocumentChunk.tenant_id == tenant_id)
+        .distinct(DocumentChunk.source_id)
     )
 
-    seen: dict[str, DocumentListItem] = {}
-    for point in results[0]:
-        payload = point.payload or {}
-        sid = str(payload.get("source_id", ""))
-        if sid and sid not in seen:
-            seen[sid] = DocumentListItem(
-                source_id=sid,
-                title=str(payload.get("title", "")),
-                source=str(payload.get("source", "")),
-            )
-
-    return DocumentListResponse(documents=list(seen.values()))
+    return DocumentListResponse(
+        documents=[
+            DocumentListItem(source_id=row.source_id, title=row.title, source=row.source) for row in result.all()
+        ]
+    )
 
 
 @router.delete("/{source_id:path}")
 async def delete_document(
     source_id: str,
     current_user: User = Depends(require_role(Role.admin, Role.member)),
+    db: AsyncSession = Depends(get_db),
 ) -> DeleteResponse:
-    tenant_id = str(current_user.tenant_id)
-    client = get_qdrant_client()
-    ensure_collection(client)
+    from rag.models import DocumentChunk
 
-    # Require both tenant_id and source_id to match — prevents cross-tenant deletion
-    client.delete(
-        collection_name=COLLECTION_NAME,
-        points_selector=Filter(
-            must=[
-                FieldCondition(key="tenant_id", match=MatchValue(value=tenant_id)),
-                FieldCondition(key="source_id", match=MatchValue(value=source_id)),
-            ]
-        ),
+    tenant_id = str(current_user.tenant_id)
+
+    await db.execute(
+        delete(DocumentChunk).where(
+            DocumentChunk.tenant_id == tenant_id,
+            DocumentChunk.source_id == source_id,
+        )
     )
+    await db.commit()
 
     return DeleteResponse(deleted=True, source_id=source_id)
 

@@ -71,17 +71,18 @@ async def ingest_audio(
     max_authorization_level: int | None = Form(None),
     current_user: User = Depends(require_role(Role.admin, Role.member)),
 ) -> IngestResponse:
-    from ..parsing.ingest import ingest_audio_transcript
+    from parsing.ingest import ingest_audio_transcript
 
     try:
         contents = await file.read()
         import tempfile
         from pathlib import Path
 
+        tenant_id = str(current_user.tenant_id)
         filename = file.filename or "temp_audio"
         tmp = Path(tempfile.gettempdir()) / filename
         tmp.write_bytes(contents)
-        count = ingest_audio_transcript(tmp, max_authorization_level=max_authorization_level)
+        count = await ingest_audio_transcript(tmp, tenant_id=tenant_id, max_authorization_level=max_authorization_level)
         return IngestResponse(message=f"audio ingested: {count} chunks")
     except Exception as e:
         return IngestResponse(message=f"error: {e}")

@@ -4,6 +4,8 @@ from sqlalchemy import engine_from_config, pool
 
 # Import all models so Base.metadata knows about them
 import auth.models  # noqa: F401
+import chat.models  # noqa: F401
+import rag.models  # noqa: F401
 from alembic import context
 from db import Base
 from settings import settings

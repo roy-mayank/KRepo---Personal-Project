@@ -35,9 +35,6 @@ class Settings(BaseSettings):
     LEMONFOX_API_KEY: str = ""
     LLAMA_CLOUD_API_KEY: str = ""
 
-    # Qdrant
-    QDRANT_PATH: str = "./qdrant_data"
-
     # Database
     DATABASE_URL: str = ""
 

@@ -1,8 +1,10 @@
 from dataclasses import dataclass
 
-from qdrant_client import models
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from .ingest import COLLECTION_NAME, ensure_collection, get_embedding_model, get_qdrant_client
+from rag.ingest import get_embedding_model
+from rag.models import DocumentChunk
 
 
 @dataclass
@@ -15,39 +17,48 @@ class RetrievedChunk:
     score: float
 
 
-def retrieve(query: str, tenant_id: str, top_k: int = 10, source_filter: str | None = None) -> list[RetrievedChunk]:
-    client = get_qdrant_client()
+async def retrieve(
+    session: AsyncSession,
+    query: str,
+    tenant_id: str,
+    top_k: int = 10,
+    source_filter: str | None = None,
+) -> list[RetrievedChunk]:
     embedder = get_embedding_model()
-    ensure_collection(client)
-
     query_embedding = list(embedder.embed([query]))[0].tolist()
 
-    must_conditions: list[models.FieldCondition] = [
-        models.FieldCondition(key="tenant_id", match=models.MatchValue(value=tenant_id))
-    ]
+    filters = [DocumentChunk.tenant_id == tenant_id]
     if source_filter:
-        must_conditions.append(models.FieldCondition(key="source", match=models.MatchValue(value=source_filter)))
-    search_filter = models.Filter(must=must_conditions)
+        filters.append(DocumentChunk.source == source_filter)
 
-    results = client.query_points(
-        collection_name=COLLECTION_NAME,
-        query=query_embedding,
-        query_filter=search_filter,
-        limit=top_k,
+    # Cosine distance: lower = more similar. Score = 1 - distance.
+    distance = DocumentChunk.embedding.cosine_distance(query_embedding)
+
+    stmt = (
+        select(
+            DocumentChunk.content,
+            DocumentChunk.source,
+            DocumentChunk.source_id,
+            DocumentChunk.title,
+            DocumentChunk.url,
+            (1 - distance).label("score"),
+        )
+        .where(*filters)
+        .order_by(distance)
+        .limit(top_k)
     )
 
-    chunks: list[RetrievedChunk] = []
-    for point in results.points:
-        payload = point.payload or {}
-        chunks.append(
-            RetrievedChunk(
-                content=str(payload.get("content", "")),
-                source=str(payload.get("source", "")),
-                source_id=str(payload.get("source_id", "")),
-                title=str(payload.get("title", "")),
-                url=str(payload.get("url", "")),
-                score=point.score if point.score is not None else 0.0,
-            )
-        )
+    result = await session.execute(stmt)
+    rows = result.all()
 
-    return chunks
+    return [
+        RetrievedChunk(
+            content=row.content,
+            source=row.source,
+            source_id=row.source_id,
+            title=row.title,
+            url=row.url,
+            score=float(row.score),
+        )
+        for row in rows
+    ]

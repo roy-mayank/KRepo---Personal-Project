@@ -1,30 +1,40 @@
-import asyncio
-import json
 import uuid
-from pathlib import Path
 from typing import Any, List, Optional, Tuple
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import BaseModel, SecretStr
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from auth.dependencies import get_current_user
 from auth.models import User
+from chat.models import ChatMessage, Conversation
+from db import get_db
 from rag.retriever import retrieve
 from settings import settings
 
 router = APIRouter()
 
-api_key_val = settings.ANTHROPIC_API_KEY if settings.ANTHROPIC_API_KEY else ""
+_llm: ChatAnthropic | None = None
 
-llm = ChatAnthropic(
-    model_name="claude-sonnet-4-20250514",
-    api_key=SecretStr(api_key_val),
-    timeout=60,
-    stop=None,
-)
+
+def _get_llm() -> ChatAnthropic:
+    global _llm
+    if _llm is None:
+        if not settings.ANTHROPIC_API_KEY:
+            raise HTTPException(status_code=503, detail="ANTHROPIC_API_KEY not configured")
+        _llm = ChatAnthropic(
+            model_name="claude-sonnet-4-20250514",
+            api_key=SecretStr(settings.ANTHROPIC_API_KEY),
+            timeout=60,
+            stop=None,
+        )
+    return _llm
+
 
 SYSTEM_PROMPT = (
     "You are KRepo Assistant, a helpful AI that answers questions about a company's "
@@ -33,21 +43,53 @@ SYSTEM_PROMPT = (
 )
 
 
-class Message(BaseModel):
+# ── Request / Response schemas ────────────────────────────────────────────────
+
+
+class MessageIn(BaseModel):
     role: str
     content: str
 
 
 class ChatRequest(BaseModel):
-    messages: list[Message]
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    messages: list[MessageIn]
+    conversation_id: str | None = None
     mode: Optional[str] = None
     level: Optional[str] = None
     task_context: Optional[dict] = None
 
 
-def _build_context(query: str, tenant_id: str) -> Tuple[str, List[Any]]:
-    chunks = retrieve(query, tenant_id=tenant_id, top_k=10)
+class ConversationOut(BaseModel):
+    id: str
+    title: str
+    created_at: str
+    updated_at: str
+
+    class Config:
+        from_attributes = True
+
+
+class MessageOut(BaseModel):
+    id: str
+    role: str
+    content: str
+    created_at: str
+
+    class Config:
+        from_attributes = True
+
+
+class ConversationDetail(BaseModel):
+    id: str
+    title: str
+    messages: list[MessageOut]
+
+
+# ── RAG helpers ───────────────────────────────────────────────────────────────
+
+
+async def _build_context(query: str, tenant_id: str, db: AsyncSession) -> Tuple[str, List[Any]]:
+    chunks = await retrieve(db, query, tenant_id=tenant_id, top_k=10)
     if not chunks:
         return "", []
 
@@ -59,11 +101,12 @@ def _build_context(query: str, tenant_id: str) -> Tuple[str, List[Any]]:
     return "\n\n---\n\n".join(context_parts), chunks
 
 
-def _to_langchain_messages(
-    messages: list[Message],
+async def _to_langchain_messages(
+    messages: list[MessageIn],
     mode: Optional[str],
     level: Optional[str],
     tenant_id: str,
+    db: AsyncSession,
     task_context: Optional[dict] = None,
 ) -> Tuple[list[Any], List[Any]]:
     last_user_msg = ""
@@ -72,7 +115,7 @@ def _to_langchain_messages(
             last_user_msg = msg.content
             break
 
-    context_text, chunks = _build_context(last_user_msg, tenant_id)
+    context_text, chunks = await _build_context(last_user_msg, tenant_id, db)
     system_content = SYSTEM_PROMPT
 
     if mode == "onboarding":
@@ -172,70 +215,171 @@ STRICT RULES:
     return lc_messages, chunks
 
 
-CHATS_DIR = Path("./.chats")
-CHATS_DIR.mkdir(exist_ok=True)
+# ── Endpoints ─────────────────────────────────────────────────────────────────
 
 
-def _chat_path(tenant_id: str, chat_id: str) -> Path:
-    tenant_dir = CHATS_DIR / tenant_id
-    tenant_dir.mkdir(exist_ok=True)
-    return tenant_dir / f"{chat_id}.json"
+@router.get("/conversations", response_model=list[ConversationOut])
+async def list_conversations(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[ConversationOut]:
+    result = await db.execute(
+        select(Conversation)
+        .where(
+            Conversation.tenant_id == current_user.tenant_id,
+            Conversation.user_id == current_user.id,
+        )
+        .order_by(Conversation.updated_at.desc())
+    )
+    convos = result.scalars().all()
+    return [
+        ConversationOut(
+            id=str(c.id),
+            title=c.title,
+            created_at=c.created_at.isoformat(),
+            updated_at=c.updated_at.isoformat(),
+        )
+        for c in convos
+    ]
 
 
-def save_chat_history(tenant_id: str, chat_id: str, messages: list[dict]) -> None:
-    with open(_chat_path(tenant_id, chat_id), "w") as f:
-        json.dump(messages, f, indent=2)
+@router.get("/conversations/{conversation_id}", response_model=ConversationDetail)
+async def get_conversation(
+    conversation_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ConversationDetail:
+    result = await db.execute(
+        select(Conversation)
+        .options(selectinload(Conversation.messages))
+        .where(
+            Conversation.id == uuid.UUID(conversation_id),
+            Conversation.tenant_id == current_user.tenant_id,
+            Conversation.user_id == current_user.id,
+        )
+    )
+    convo = result.scalar_one_or_none()
+    if not convo:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return ConversationDetail(
+        id=str(convo.id),
+        title=convo.title,
+        messages=[
+            MessageOut(
+                id=str(m.id),
+                role=m.role,
+                content=m.content,
+                created_at=m.created_at.isoformat(),
+            )
+            for m in convo.messages
+        ],
+    )
 
 
-def load_chat_history(tenant_id: str, chat_id: str) -> list[dict]:
-    path = _chat_path(tenant_id, chat_id)
-    if path.exists():
-        with open(path) as f:
-            return json.load(f)
-    return []
+@router.delete("/conversations/{conversation_id}")
+async def delete_conversation(
+    conversation_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, str]:
+    result = await db.execute(
+        select(Conversation).where(
+            Conversation.id == uuid.UUID(conversation_id),
+            Conversation.tenant_id == current_user.tenant_id,
+            Conversation.user_id == current_user.id,
+        )
+    )
+    convo = result.scalar_one_or_none()
+    if not convo:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    await db.delete(convo)
+    await db.commit()
+    return {"status": "deleted"}
 
 
 @router.post("/chat")
 async def chat(
     request: ChatRequest,
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> StreamingResponse:
     tenant_id = str(current_user.tenant_id)
-    print(f"Received request for chat ID: {request.id} (tenant: {tenant_id})")
 
-    lc_messages, chunks = _to_langchain_messages(
-        request.messages, request.mode, request.level, tenant_id, request.task_context
+    # Resolve or create conversation
+    convo: Conversation | None = None
+    if request.conversation_id:
+        result = await db.execute(
+            select(Conversation).where(
+                Conversation.id == uuid.UUID(request.conversation_id),
+                Conversation.tenant_id == current_user.tenant_id,
+                Conversation.user_id == current_user.id,
+            )
+        )
+        convo = result.scalar_one_or_none()
+        if not convo:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+
+    if convo is None:
+        # Auto-title from first user message
+        first_user_msg = next((m.content for m in request.messages if m.role == "user"), "New chat")
+        title = first_user_msg[:100].strip() or "New chat"
+        convo = Conversation(
+            tenant_id=current_user.tenant_id,
+            user_id=current_user.id,
+            title=title,
+        )
+        db.add(convo)
+        await db.flush()  # populate convo.id
+
+    # Save the user message(s) that aren't already persisted
+    last_user_msg = request.messages[-1] if request.messages else None
+    if last_user_msg and last_user_msg.role == "user":
+        db.add(
+            ChatMessage(
+                conversation_id=convo.id,
+                role="user",
+                content=last_user_msg.content,
+            )
+        )
+
+    # Commit so the streaming generator's separate session can see the conversation
+    await db.commit()
+
+    conversation_id = convo.id
+
+    lc_messages, _chunks = await _to_langchain_messages(
+        request.messages, request.mode, request.level, tenant_id, db, request.task_context
     )
 
-    async def stream_response():
-        for word in "This is a mock response because Anthropic is being difficult.".split():
-            yield f"0:{json.dumps(word + ' ')}\n"
-            await asyncio.sleep(0.1)
+    llm = _get_llm()
 
-        full_assistant_content = ""
+    async def stream_response():
+        full_content = ""
 
         async for chunk in llm.astream(lc_messages):
             text = chunk.content
             if isinstance(text, str) and text:
-                full_assistant_content += text
-                yield f"0:{json.dumps(text)}\n"
+                full_content += text
+                yield text
 
-        updated_messages = [msg.model_dump() for msg in request.messages]
-        updated_messages.append({"role": "assistant", "content": full_assistant_content})
-        save_chat_history(tenant_id, request.id, updated_messages)
+        # Save assistant message after stream completes
+        async with _session_factory() as session:
+            session.add(
+                ChatMessage(
+                    conversation_id=conversation_id,
+                    role="assistant",
+                    content=full_content,
+                )
+            )
+            await session.commit()
 
-        if chunks:
-            citations = [
-                {
-                    "source": c.source,
-                    "title": c.title,
-                    "url": c.url,
-                    "score": getattr(c, "score", None),
-                }
-                for c in chunks
-            ]
-            yield f"c:{json.dumps(citations)}\n"
+    # Return conversation_id in a header so the frontend can track it
+    return StreamingResponse(
+        stream_response(),
+        media_type="text/plain",
+        headers={"X-Conversation-Id": str(conversation_id)},
+    )
 
-        yield 'd:{"finishReason":"stop","usage":{"promptTokens":0,"completionTokens":0}}\n'
 
-    return StreamingResponse(stream_response(), media_type="text/plain")
+# Import session factory for use inside the streaming generator
+from db import _session_factory  # noqa: E402

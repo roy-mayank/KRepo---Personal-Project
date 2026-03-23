@@ -4,13 +4,6 @@ import re
 from pathlib import Path
 from typing import List
 
-from ..rag.ingest import (
-    _ingest_document,
-    ensure_collection,
-    get_embedding_model,
-    get_qdrant_client,
-)
-
 _SENTENCE_RE = re.compile(r"(?<=[.!?])\s+")
 
 
@@ -22,13 +15,17 @@ def _chunk_by_sentences(text: str, sentences_per_chunk: int = 3) -> List[str]:
     return [" ".join(sentences[i : i + sentences_per_chunk]) for i in range(0, len(sentences), sentences_per_chunk)]
 
 
-def ingest_audio_transcript(
+async def ingest_audio_transcript(
     file_path: str | Path,
+    tenant_id: str,
     sentences_per_chunk: int = 3,
     max_authorization_level: int | str | None = None,
 ) -> int:
+    from db import _session_factory
+
     from ..integrations.base import Document
-    from .audio_transcriber import transcribe_audio  # avoid circular import
+    from ..rag.ingest import ingest_document
+    from .audio_transcriber import transcribe_audio
 
     text = transcribe_audio(file_path)
     if not text:
@@ -37,10 +34,6 @@ def ingest_audio_transcript(
     chunks = _chunk_by_sentences(text, sentences_per_chunk)
     if not chunks:
         return 0
-
-    client = get_qdrant_client()
-    embedder = get_embedding_model()
-    ensure_collection(client)
 
     source = "audio"
     source_id = str(Path(file_path))
@@ -51,14 +44,15 @@ def ingest_audio_transcript(
         metadata["max_authorization_level"] = str(max_authorization_level)
 
     total = 0
-    for chunk in chunks:
-        doc = Document(
-            source=source,
-            source_id=source_id,
-            title=title,
-            content=chunk,
-            url=url,
-            metadata=metadata,
-        )
-        total += _ingest_document(client, embedder, doc)
+    async with _session_factory() as session:
+        for chunk in chunks:
+            doc = Document(
+                source=source,
+                source_id=source_id,
+                title=title,
+                content=chunk,
+                url=url,
+                metadata=metadata,
+            )
+            total += await ingest_document(session, doc, tenant_id)
     return total

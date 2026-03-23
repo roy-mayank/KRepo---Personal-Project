@@ -1,12 +1,12 @@
 # pyright: reportMissingImports=false
 from fastembed import TextEmbedding  # type: ignore
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from qdrant_client import QdrantClient, models
+from sqlalchemy import delete
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from integrations.base import BaseIntegration, Document
-from settings import settings
+from rag.models import DocumentChunk
 
-COLLECTION_NAME = "krepo"
 EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 200
@@ -16,40 +16,27 @@ _splitter = RecursiveCharacterTextSplitter(
     chunk_overlap=CHUNK_OVERLAP,
 )
 
-
-def get_qdrant_client() -> QdrantClient:
-    return QdrantClient(path=settings.QDRANT_PATH)
+_embedder: TextEmbedding | None = None
 
 
 def get_embedding_model() -> TextEmbedding:
-    return TextEmbedding(model_name=EMBEDDING_MODEL)
-
-
-def ensure_collection(client: QdrantClient, embedding_dim: int = 384) -> None:
-    collections = [c.name for c in client.get_collections().collections]
-    if COLLECTION_NAME not in collections:
-        client.create_collection(
-            collection_name=COLLECTION_NAME,
-            vectors_config=models.VectorParams(
-                size=embedding_dim,
-                distance=models.Distance.COSINE,
-            ),
-        )
+    global _embedder
+    if _embedder is None:
+        _embedder = TextEmbedding(model_name=EMBEDDING_MODEL)
+    return _embedder
 
 
 async def ingest_integration(integration: BaseIntegration, tenant_id: str) -> int:
-    client = get_qdrant_client()
-    embedder = get_embedding_model()
-    ensure_collection(client)
+    from db import _session_factory
 
     count = 0
     async for doc in integration.fetch_documents():
-        count += _ingest_document(client, embedder, doc, tenant_id)
-
+        async with _session_factory() as session:
+            count += await ingest_document(session, doc, tenant_id)
     return count
 
 
-def _ingest_document(client: QdrantClient, embedder: TextEmbedding, doc: Document, tenant_id: str) -> int:
+async def ingest_document(session: AsyncSession, doc: Document, tenant_id: str) -> int:
     if not doc.content.strip():
         return 0
 
@@ -57,34 +44,31 @@ def _ingest_document(client: QdrantClient, embedder: TextEmbedding, doc: Documen
     if not chunks:
         return 0
 
+    embedder = get_embedding_model()
     embeddings = list(embedder.embed(chunks))
 
-    points = []
-    for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
-        point_id = _make_point_id(doc.source, doc.source_id, i, tenant_id)
-        points.append(
-            models.PointStruct(
-                id=point_id,
-                vector=embedding.tolist(),
-                payload={
-                    "tenant_id": tenant_id,
-                    "source": doc.source,
-                    "source_id": doc.source_id,
-                    "title": doc.title,
-                    "url": doc.url,
-                    "chunk_index": i,
-                    "content": chunk,
-                    **doc.metadata,
-                },
+    # Upsert: delete existing chunks for this source_id + tenant, then insert
+    await session.execute(
+        delete(DocumentChunk).where(
+            DocumentChunk.tenant_id == tenant_id,
+            DocumentChunk.source_id == doc.source_id,
+        )
+    )
+
+    for i, (chunk_text, embedding) in enumerate(zip(chunks, embeddings)):
+        session.add(
+            DocumentChunk(
+                tenant_id=tenant_id,
+                source=doc.source,
+                source_id=doc.source_id,
+                title=doc.title,
+                url=doc.url,
+                chunk_index=i,
+                content=chunk_text,
+                embedding=embedding.tolist(),
+                metadata_=doc.metadata,
             )
         )
 
-    client.upsert(collection_name=COLLECTION_NAME, points=points)
-    return len(points)
-
-
-def _make_point_id(source: str, source_id: str, chunk_index: int, tenant_id: str = "") -> str:
-    import hashlib
-
-    raw = f"{tenant_id}:{source}:{source_id}:{chunk_index}"
-    return hashlib.md5(raw.encode()).hexdigest()  # noqa: S324
+    await session.commit()
+    return len(chunks)
