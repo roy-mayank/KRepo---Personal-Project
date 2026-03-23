@@ -3,23 +3,32 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+
+from auth.dependencies import get_current_user, require_role
+from auth.models import Role, User
 
 router = APIRouter(prefix="/onboarding")
 
-TASKS_FILE = Path("./.onboarding_tasks.json")
+TASKS_DIR = Path("./.tasks")
+TASKS_DIR.mkdir(exist_ok=True)
 
 
-def _load_tasks() -> list[dict]:
-    if TASKS_FILE.exists():
-        with open(TASKS_FILE) as f:
+def _tasks_file(tenant_id: str) -> Path:
+    return TASKS_DIR / f"{tenant_id}.json"
+
+
+def _load_tasks(tenant_id: str) -> list[dict]:
+    path = _tasks_file(tenant_id)
+    if path.exists():
+        with open(path) as f:
             return json.load(f)
     return []
 
 
-def _save_tasks(tasks: list[dict]):
-    with open(TASKS_FILE, "w") as f:
+def _save_tasks(tenant_id: str, tasks: list[dict]) -> None:
+    with open(_tasks_file(tenant_id), "w") as f:
         json.dump(tasks, f, indent=2)
 
 
@@ -32,10 +41,6 @@ class TaskCreate(BaseModel):
 
 
 async def _generate_learning_path(task: dict) -> dict | None:
-    """Call Claude Haiku to generate a skill-tree learning path for a task.
-
-    Returns a dict like {"nodes": [...]} or None on failure.
-    """
     try:
         import anthropic
 
@@ -72,7 +77,6 @@ async def _generate_learning_path(task: dict) -> dict | None:
         )
 
         text = msg.content[0].text.strip()
-        # Strip markdown code fences if the model wraps anyway
         if text.startswith("```"):
             lines = text.splitlines()
             inner = lines[1:-1] if lines[-1].strip() == "```" else lines[1:]
@@ -86,46 +90,57 @@ async def _generate_learning_path(task: dict) -> dict | None:
 
 
 @router.post("/tasks")
-async def create_task(task: TaskCreate) -> dict:
-    tasks = _load_tasks()
+async def create_task(
+    task: TaskCreate,
+    current_user: User = Depends(require_role(Role.admin, Role.member)),
+) -> dict:
+    tenant_id = str(current_user.tenant_id)
+    tasks = _load_tasks(tenant_id)
     new_task = {
         "id": str(uuid.uuid4()),
         **task.model_dump(),
         "learning_path": None,
     }
 
-    # Generate path synchronously — Haiku takes ~1-3 s
     path = await _generate_learning_path(new_task)
     new_task["learning_path"] = path
 
     tasks.append(new_task)
-    _save_tasks(tasks)
+    _save_tasks(tenant_id, tasks)
     return new_task
 
 
 @router.post("/tasks/{task_id}/generate-path")
-async def regenerate_path(task_id: str) -> dict:
-    """Re-generate the learning path for an existing task."""
-    tasks = _load_tasks()
+async def regenerate_path(
+    task_id: str,
+    current_user: User = Depends(require_role(Role.admin, Role.member)),
+) -> dict:
+    tenant_id = str(current_user.tenant_id)
+    tasks = _load_tasks(tenant_id)
     for i, t in enumerate(tasks):
         if t["id"] == task_id:
             path = await _generate_learning_path(t)
             if path is None:
                 raise HTTPException(status_code=500, detail="Path generation failed")
             tasks[i]["learning_path"] = path
-            _save_tasks(tasks)
+            _save_tasks(tenant_id, tasks)
             return tasks[i]
     raise HTTPException(status_code=404, detail="Task not found")
 
 
 @router.get("/tasks")
-async def list_tasks() -> list[dict]:
-    return _load_tasks()
+async def list_tasks(
+    current_user: User = Depends(get_current_user),
+) -> list[dict]:
+    return _load_tasks(str(current_user.tenant_id))
 
 
 @router.get("/tasks/{task_id}")
-async def get_task(task_id: str) -> dict:
-    tasks = _load_tasks()
+async def get_task(
+    task_id: str,
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    tasks = _load_tasks(str(current_user.tenant_id))
     for t in tasks:
         if t["id"] == task_id:
             return t
@@ -133,10 +148,14 @@ async def get_task(task_id: str) -> dict:
 
 
 @router.delete("/tasks/{task_id}")
-async def delete_task(task_id: str) -> dict:
-    tasks = _load_tasks()
+async def delete_task(
+    task_id: str,
+    current_user: User = Depends(require_role(Role.admin, Role.member)),
+) -> dict:
+    tenant_id = str(current_user.tenant_id)
+    tasks = _load_tasks(tenant_id)
     remaining = [t for t in tasks if t["id"] != task_id]
     if len(remaining) == len(tasks):
         raise HTTPException(status_code=404, detail="Task not found")
-    _save_tasks(remaining)
+    _save_tasks(tenant_id, remaining)
     return {"deleted": task_id}

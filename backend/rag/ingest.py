@@ -37,19 +37,19 @@ def ensure_collection(client: QdrantClient, embedding_dim: int = 384) -> None:
         )
 
 
-async def ingest_integration(integration: BaseIntegration) -> int:
+async def ingest_integration(integration: BaseIntegration, tenant_id: str) -> int:
     client = get_qdrant_client()
     embedder = get_embedding_model()
     ensure_collection(client)
 
     count = 0
     async for doc in integration.fetch_documents():
-        count += _ingest_document(client, embedder, doc)
+        count += _ingest_document(client, embedder, doc, tenant_id)
 
     return count
 
 
-def _ingest_document(client: QdrantClient, embedder: TextEmbedding, doc: Document) -> int:
+def _ingest_document(client: QdrantClient, embedder: TextEmbedding, doc: Document, tenant_id: str) -> int:
     if not doc.content.strip():
         return 0
 
@@ -61,12 +61,13 @@ def _ingest_document(client: QdrantClient, embedder: TextEmbedding, doc: Documen
 
     points = []
     for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
-        point_id = _make_point_id(doc.source, doc.source_id, i)
+        point_id = _make_point_id(doc.source, doc.source_id, i, tenant_id)
         points.append(
             models.PointStruct(
                 id=point_id,
                 vector=embedding.tolist(),
                 payload={
+                    "tenant_id": tenant_id,
                     "source": doc.source,
                     "source_id": doc.source_id,
                     "title": doc.title,
@@ -82,8 +83,8 @@ def _ingest_document(client: QdrantClient, embedder: TextEmbedding, doc: Documen
     return len(points)
 
 
-def _make_point_id(source: str, source_id: str, chunk_index: int) -> str:
+def _make_point_id(source: str, source_id: str, chunk_index: int, tenant_id: str = "") -> str:
     import hashlib
 
-    raw = f"{source}:{source_id}:{chunk_index}"
+    raw = f"{tenant_id}:{source}:{source_id}:{chunk_index}"
     return hashlib.md5(raw.encode()).hexdigest()  # noqa: S324

@@ -38,6 +38,13 @@ class Settings(BaseSettings):
     # Qdrant
     QDRANT_PATH: str = "./qdrant_data"
 
+    # Database
+    DATABASE_URL: str = ""
+
+    # Auth
+    JWT_SECRET: str = ""
+    INVITE_TOKEN_EXPIRE_HOURS: int = 72
+
 
 settings = Settings()
 

@@ -1,11 +1,14 @@
-from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, UploadFile
 from pydantic import BaseModel
 
+from auth.dependencies import get_current_user, require_role
+from auth.models import Role, User
 from integrations import available, get_integration
 from rag.ingest import ingest_integration
 
 router = APIRouter()
 
+# Keyed as "{tenant_id}:{source}" to isolate status per tenant
 _ingest_status: dict[str, str] = {}
 
 
@@ -17,35 +20,48 @@ class IngestStatusResponse(BaseModel):
     status: dict[str, str]
 
 
-async def _run_ingestion(source: str) -> None:
-    _ingest_status[source] = "running"
+async def _run_ingestion(source: str, tenant_id: str) -> None:
+    key = f"{tenant_id}:{source}"
+    _ingest_status[key] = "running"
     try:
         cls = get_integration(source)
         if cls is None:
-            _ingest_status[source] = f"error: unknown source '{source}'"
+            _ingest_status[key] = f"error: unknown source '{source}'"
             return
-
         integration = cls()
-        count = await ingest_integration(integration)
-        _ingest_status[source] = f"completed: {count} chunks ingested"
+        count = await ingest_integration(integration, tenant_id)
+        _ingest_status[key] = f"completed: {count} chunks ingested"
     except Exception as e:
-        _ingest_status[source] = f"error: {e}"
+        _ingest_status[key] = f"error: {e}"
 
 
 @router.post("/ingest/{source}")
-async def ingest(source: str, background_tasks: BackgroundTasks) -> IngestResponse:
-    background_tasks.add_task(_run_ingestion, source)
-    _ingest_status[source] = "started"
+async def ingest(
+    source: str,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(require_role(Role.admin, Role.member)),
+) -> IngestResponse:
+    tenant_id = str(current_user.tenant_id)
+    background_tasks.add_task(_run_ingestion, source, tenant_id)
+    _ingest_status[f"{tenant_id}:{source}"] = "started"
     return IngestResponse(message=f"Ingestion started for {source}")
 
 
 @router.get("/ingest/status")
-async def ingest_status() -> IngestStatusResponse:
-    return IngestStatusResponse(status=_ingest_status)
+async def ingest_status(
+    current_user: User = Depends(get_current_user),
+) -> IngestStatusResponse:
+    tenant_id = str(current_user.tenant_id)
+    tenant_status = {
+        key.split(":", 1)[1]: val for key, val in _ingest_status.items() if key.startswith(f"{tenant_id}:")
+    }
+    return IngestStatusResponse(status=tenant_status)
 
 
 @router.get("/integrations")
-async def list_integrations() -> dict[str, str]:
+async def list_integrations(
+    _: User = Depends(get_current_user),
+) -> dict[str, str]:
     return available()
 
 
@@ -53,13 +69,12 @@ async def list_integrations() -> dict[str, str]:
 async def ingest_audio(
     file: UploadFile = File(...),
     max_authorization_level: int | None = Form(None),
+    current_user: User = Depends(require_role(Role.admin, Role.member)),
 ) -> IngestResponse:
-
     from ..parsing.ingest import ingest_audio_transcript
 
     try:
         contents = await file.read()
-        # write to temp file on disk to satisfy the existing helper
         import tempfile
         from pathlib import Path
 

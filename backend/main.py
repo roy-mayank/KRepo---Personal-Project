@@ -1,13 +1,24 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from auth.router import router as auth_router
 from chat.router import router as chat_router
+from db import create_all_tables
 from onboarding.router import router as onboarding_router
 from rag.documents import router as documents_router
 from rag.github_router import router as github_router
 from rag.router import router as rag_router
 
-app = FastAPI(title="KRepo API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await create_all_tables()
+    yield
+
+
+app = FastAPI(title="KRepo API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -17,6 +28,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router)
 app.include_router(chat_router)
 app.include_router(onboarding_router)
 app.include_router(rag_router)
