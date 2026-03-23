@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { ArrowLeft, Send, BookOpen, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import SkillTree from './SkillTree'
+import { useTasks } from '@/lib/queries'
 
 const API = import.meta.env.VITE_API_URL
 
@@ -225,18 +226,9 @@ function LearningSession({ task, onBack }) {
 
 // ── Task picker ──────────────────────────────────────────────────────────────
 export default function OnboardingEmployee({ onBack }) {
-  const [tasks, setTasks] = useState([])
-  const [loading, setLoading] = useState(true)
+  const { data: tasks = [], isLoading: loading, error: queryError } = useTasks()
   const [selectedTask, setSelectedTask] = useState(null)
-  const [error, setError] = useState(null)
-
-  useEffect(() => {
-    fetch(`${API}/onboarding/tasks`)
-      .then((r) => r.json())
-      .then((data) => setTasks(Array.isArray(data) ? data : []))
-      .catch(() => setError('Could not load tasks. Is the backend running?'))
-      .finally(() => setLoading(false))
-  }, [])
+  const error = queryError?.message || null
 
   if (selectedTask) {
     return <LearningSession task={selectedTask} onBack={() => setSelectedTask(null)} />

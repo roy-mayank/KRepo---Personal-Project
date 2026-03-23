@@ -1,11 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Plus, Trash2, ChevronUp, GitBranch, ToggleLeft, ToggleRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-
-const API = import.meta.env.VITE_API_URL
+import { useTasks, useCreateTask, useDeleteTask } from '@/lib/queries'
 
 const EMPTY_FORM = {
   title: '',
@@ -16,35 +15,18 @@ const EMPTY_FORM = {
 }
 
 export default function TasksPage() {
-  const [tasks, setTasks] = useState([])
-  const [loading, setLoading] = useState(false)
+  const { data: tasks = [], isLoading } = useTasks()
+  const createTask = useCreateTask()
+  const deleteTask = useDeleteTask()
+
   const [showForm, setShowForm] = useState(false)
   const [isOnboarding, setIsOnboarding] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState(null)
-
-  const fetchTasks = async () => {
-    setLoading(true)
-    try {
-      const res = await fetch(`${API}/onboarding/tasks`)
-      const data = await res.json()
-      setTasks(data)
-    } catch {
-      setError('Failed to load tasks.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchTasks()
-  }, [])
 
   const resetForm = () => {
     setForm(EMPTY_FORM)
     setIsOnboarding(false)
-    setError(null)
+    createTask.reset()
   }
 
   const toggleForm = () => {
@@ -54,43 +36,22 @@ export default function TasksPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setSubmitting(true)
-    setError(null)
-    try {
-      const payload = {
-        title: form.title.trim(),
-        description: form.description.trim(),
-        required_skills: form.required_skills
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean),
-        assignee_name: isOnboarding ? form.assignee_name.trim() || null : null,
-        created_by: isOnboarding ? form.created_by.trim() || null : null,
-      }
-      const res = await fetch(`${API}/onboarding/tasks`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (!res.ok) throw new Error('Failed to create task')
-      resetForm()
-      setShowForm(false)
-      await fetchTasks()
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setSubmitting(false)
+    const payload = {
+      title: form.title.trim(),
+      description: form.description.trim(),
+      required_skills: form.required_skills
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+      assignee_name: isOnboarding ? form.assignee_name.trim() || null : null,
+      created_by: isOnboarding ? form.created_by.trim() || null : null,
     }
+    await createTask.mutateAsync(payload)
+    resetForm()
+    setShowForm(false)
   }
 
-  const handleDelete = async (id) => {
-    try {
-      await fetch(`${API}/onboarding/tasks/${id}`, { method: 'DELETE' })
-      setTasks((prev) => prev.filter((t) => t.id !== id))
-    } catch {
-      setError('Failed to delete task.')
-    }
-  }
+  const error = createTask.error?.message || deleteTask.error?.message
 
   return (
     <div className="h-full overflow-y-auto p-6">
@@ -214,10 +175,10 @@ export default function TasksPage() {
 
                 <Button
                   type="submit"
-                  disabled={submitting}
+                  disabled={createTask.isPending}
                   className="bg-blue-600 hover:bg-blue-500 text-white"
                 >
-                  {submitting ? 'Creating & generating learning path…' : 'Create Task'}
+                  {createTask.isPending ? 'Creating & generating learning path…' : 'Create Task'}
                 </Button>
               </form>
             </CardContent>
@@ -227,10 +188,10 @@ export default function TasksPage() {
         {/* Task list */}
         <div>
           <p className="text-sm text-gray-500 mb-3">
-            {loading ? 'Loading…' : `${tasks.length} task${tasks.length !== 1 ? 's' : ''}`}
+            {isLoading ? 'Loading…' : `${tasks.length} task${tasks.length !== 1 ? 's' : ''}`}
           </p>
 
-          {!loading && tasks.length === 0 && (
+          {!isLoading && tasks.length === 0 && (
             <div className="text-center py-16 text-gray-700 border border-dashed border-gray-800 rounded-xl">
               <p className="text-sm">No tasks yet.</p>
               <p className="text-xs mt-1 text-gray-800">Create one to get started.</p>
@@ -275,7 +236,7 @@ export default function TasksPage() {
                       variant="ghost"
                       size="icon"
                       className="shrink-0 text-gray-700 hover:text-red-400"
-                      onClick={() => handleDelete(task.id)}
+                      onClick={() => deleteTask.mutate(task.id)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>

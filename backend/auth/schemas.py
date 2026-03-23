@@ -51,3 +51,10 @@ class TenantResponse(BaseModel):
     slug: str
 
     model_config = {"from_attributes": True}
+
+
+class TenantMembership(BaseModel):
+    tenant: TenantResponse
+    role: Role
+
+    model_config = {"from_attributes": True}

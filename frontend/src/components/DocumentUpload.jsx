@@ -1,15 +1,18 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Upload, FileText, Trash2, Github, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Input } from '@/components/ui/input'
-
-const API_URL = import.meta.env.VITE_API_URL
+import { useDocuments, useUploadDocument, useDeleteDocument, useGitHubIngest } from '@/lib/queries'
+import { API_URL } from '@/lib/api'
 
 export default function DocumentUpload() {
-  const [documents, setDocuments] = useState([])
-  const [uploading, setUploading] = useState(false)
+  const { data: documents = [], isLoading } = useDocuments()
+  const uploadDoc = useUploadDocument()
+  const deleteDoc = useDeleteDocument()
+  const githubIngest = useGitHubIngest()
+
   const [dragActive, setDragActive] = useState(false)
   const [message, setMessage] = useState(null)
   const fileInputRef = useRef(null)
@@ -21,20 +24,6 @@ export default function DocumentUpload() {
   const [ghMessage, setGhMessage] = useState(null)
   const pollRef = useRef(null)
 
-  const fetchDocuments = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_URL}/documents/`)
-      const data = await res.json()
-      setDocuments(data.documents || [])
-    } catch {
-      /* server may not be running */
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchDocuments()
-  }, [fetchDocuments])
-
   // cleanup polling on unmount
   useEffect(() => {
     return () => {
@@ -44,45 +33,24 @@ export default function DocumentUpload() {
 
   const handleUpload = async (files) => {
     if (!files || files.length === 0) return
-    setUploading(true)
     setMessage(null)
 
     try {
       for (const file of files) {
-        const formData = new FormData()
-        formData.append('file', file)
-
-        const res = await fetch(`${API_URL}/documents/upload`, {
-          method: 'POST',
-          body: formData,
-        })
-
-        if (!res.ok) {
-          const err = await res.json()
-          setMessage({ type: 'error', text: err.detail || 'Upload failed' })
-          continue
-        }
-
-        const data = await res.json()
+        const data = await uploadDoc.mutateAsync(file)
         setMessage({
           type: 'success',
           text: `Uploaded "${data.filename}" — ${data.chunks_ingested} chunks ingested`,
         })
       }
-      await fetchDocuments()
-    } catch {
-      setMessage({ type: 'error', text: 'Upload failed. Is the backend running?' })
-    } finally {
-      setUploading(false)
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message || 'Upload failed' })
     }
   }
 
   const handleDelete = async (sourceId) => {
     try {
-      await fetch(`${API_URL}/documents/${encodeURIComponent(sourceId)}`, {
-        method: 'DELETE',
-      })
-      await fetchDocuments()
+      await deleteDoc.mutateAsync(sourceId)
     } catch {
       setMessage({ type: 'error', text: 'Delete failed' })
     }
@@ -112,18 +80,7 @@ export default function DocumentUpload() {
       const body = { repos }
       if (ghToken.trim()) body.token = ghToken.trim()
 
-      const res = await fetch(`${API_URL}/github/ingest`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-
-      if (!res.ok) {
-        const err = await res.json()
-        setGhMessage({ type: 'error', text: err.detail || 'Failed to start ingestion' })
-        setGhSyncing(false)
-        return
-      }
+      await githubIngest.mutateAsync(body)
 
       const statusKey = repos.join(',')
       pollRef.current = setInterval(async () => {
@@ -137,7 +94,6 @@ export default function DocumentUpload() {
             clearInterval(pollRef.current)
             setGhSyncing(false)
             setGhMessage({ type: 'success', text: `Synced — ${status.replace('completed: ', '')}` })
-            fetchDocuments()
           } else if (status.startsWith('error')) {
             clearInterval(pollRef.current)
             setGhSyncing(false)
@@ -149,11 +105,13 @@ export default function DocumentUpload() {
           /* ignore transient poll errors */
         }
       }, 2000)
-    } catch {
-      setGhMessage({ type: 'error', text: 'Failed to connect. Is the backend running?' })
+    } catch (err) {
+      setGhMessage({ type: 'error', text: err.message || 'Failed to connect' })
       setGhSyncing(false)
     }
   }
+
+  const uploading = uploadDoc.isPending
 
   return (
     <Card className="flex h-full flex-col p-4 gap-4 overflow-y-auto">
@@ -232,7 +190,9 @@ export default function DocumentUpload() {
 
       {/* Document list */}
       <div className="flex flex-col gap-2 flex-1 min-h-0">
-        <h3 className="text-sm font-medium text-muted-foreground">Ingested Documents</h3>
+        <h3 className="text-sm font-medium text-muted-foreground">
+          {isLoading ? 'Loading…' : 'Ingested Documents'}
+        </h3>
         <ScrollArea className="flex-1">
           {documents.length === 0 ? (
             <p className="text-sm text-muted-foreground/60 py-4 text-center">

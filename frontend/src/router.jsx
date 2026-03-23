@@ -9,6 +9,7 @@ import {
 import LandingPage from '@/components/LandingPage'
 import LoginPage from '@/components/LoginPage'
 import SignupPage from '@/components/SignupPage'
+import OrgOnboarding from '@/components/OrgOnboarding'
 import DashboardLayout from '@/components/DashboardLayout'
 import Chat from '@/components/Chat'
 import DocumentUpload from '@/components/DocumentUpload'
@@ -45,7 +46,23 @@ const signupRoute = createRoute({
   component: SignupPage,
 })
 
-// Dashboard layout — auth guard here protects all children
+// Org onboarding — must be logged in but no org yet
+const onboardRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/onboard',
+  component: OrgOnboarding,
+  beforeLoad: ({ context }) => {
+    if (!context.auth.user) {
+      throw redirect({ to: '/login' })
+    }
+    // Already has an org? Go to dashboard
+    if (context.auth.hasOrg) {
+      throw redirect({ to: '/dashboard' })
+    }
+  },
+})
+
+// Dashboard layout — must be logged in AND have an org
 const dashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/dashboard',
@@ -53,6 +70,9 @@ const dashboardRoute = createRoute({
   beforeLoad: ({ context }) => {
     if (!context.auth.user) {
       throw redirect({ to: '/login' })
+    }
+    if (!context.auth.hasOrg) {
+      throw redirect({ to: '/onboard' })
     }
   },
 })
@@ -117,6 +137,7 @@ const routeTree = rootRoute.addChildren([
   landingRoute,
   loginRoute,
   signupRoute,
+  onboardRoute,
   dashboardRoute.addChildren([
     dashboardIndexRoute,
     chatRoute,

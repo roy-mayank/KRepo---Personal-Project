@@ -1,88 +1,45 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Plus, Trash2, ArrowLeft, ChevronDown, ChevronUp, GitBranch } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { useTasks, useCreateTask, useDeleteTask } from '@/lib/queries'
 
-const API = import.meta.env.VITE_API_URL
+const EMPTY_FORM = {
+  title: '',
+  description: '',
+  required_skills: '',
+  assignee_name: '',
+  created_by: '',
+}
 
 export default function OnboardingManager({ onBack }) {
-  const [tasks, setTasks] = useState([])
-  const [loading, setLoading] = useState(false)
+  const { data: tasks = [], isLoading } = useTasks()
+  const createTask = useCreateTask()
+  const deleteTask = useDeleteTask()
+
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({
-    title: '',
-    description: '',
-    required_skills: '',
-    assignee_name: '',
-    created_by: '',
-  })
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState(null)
-
-  const fetchTasks = async () => {
-    setLoading(true)
-    try {
-      const res = await fetch(`${API}/onboarding/tasks`)
-      const data = await res.json()
-      setTasks(data)
-    } catch {
-      setError('Failed to load tasks.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchTasks()
-  }, [])
+  const [form, setForm] = useState(EMPTY_FORM)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setSubmitting(true)
-    setError(null)
-    try {
-      const payload = {
-        title: form.title.trim(),
-        description: form.description.trim(),
-        required_skills: form.required_skills
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean),
-        assignee_name: form.assignee_name.trim() || null,
-        created_by: form.created_by.trim() || null,
-      }
-      const res = await fetch(`${API}/onboarding/tasks`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (!res.ok) throw new Error('Failed to create task')
-      setForm({
-        title: '',
-        description: '',
-        required_skills: '',
-        assignee_name: '',
-        created_by: '',
-      })
-      setShowForm(false)
-      await fetchTasks()
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setSubmitting(false)
+    const payload = {
+      title: form.title.trim(),
+      description: form.description.trim(),
+      required_skills: form.required_skills
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+      assignee_name: form.assignee_name.trim() || null,
+      created_by: form.created_by.trim() || null,
     }
+    await createTask.mutateAsync(payload)
+    setForm(EMPTY_FORM)
+    setShowForm(false)
   }
 
-  const handleDelete = async (id) => {
-    try {
-      await fetch(`${API}/onboarding/tasks/${id}`, { method: 'DELETE' })
-      setTasks((prev) => prev.filter((t) => t.id !== id))
-    } catch {
-      setError('Failed to delete task.')
-    }
-  }
+  const error = createTask.error?.message || deleteTask.error?.message
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto p-4">
@@ -168,8 +125,8 @@ export default function OnboardingManager({ onBack }) {
                 </div>
               </div>
               {error && <p className="text-xs text-destructive">{error}</p>}
-              <Button type="submit" disabled={submitting}>
-                {submitting ? 'Creating & generating learning path…' : 'Create Task'}
+              <Button type="submit" disabled={createTask.isPending}>
+                {createTask.isPending ? 'Creating & generating learning path…' : 'Create Task'}
               </Button>
             </form>
           </CardContent>
@@ -178,11 +135,11 @@ export default function OnboardingManager({ onBack }) {
 
       <div>
         <h3 className="mb-2 text-sm font-medium text-muted-foreground">
-          {loading
+          {isLoading
             ? 'Loading tasks...'
             : `${tasks.length} onboarding task${tasks.length !== 1 ? 's' : ''}`}
         </h3>
-        {!loading && tasks.length === 0 && (
+        {!isLoading && tasks.length === 0 && (
           <p className="text-sm text-muted-foreground">
             No tasks yet. Create one to assign to a team member.
           </p>
@@ -222,7 +179,7 @@ export default function OnboardingManager({ onBack }) {
                     variant="ghost"
                     size="icon"
                     className="shrink-0 text-muted-foreground hover:text-destructive"
-                    onClick={() => handleDelete(task.id)}
+                    onClick={() => deleteTask.mutate(task.id)}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>

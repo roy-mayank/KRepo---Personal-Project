@@ -2,8 +2,10 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from auth.dependencies import get_current_user, require_role
 from auth.firebase import verify_firebase_token
@@ -14,6 +16,7 @@ from auth.schemas import (
     InviteRequest,
     InviteResponse,
     RegisterResponse,
+    TenantMembership,
     TenantRegister,
     TenantResponse,
     UserResponse,
@@ -22,6 +25,7 @@ from db import get_db
 from settings import settings
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
 
 def _slugify(name: str) -> str:
@@ -167,6 +171,41 @@ async def invite_user(
         role=body.role,
         expires_in_hours=settings.INVITE_TOKEN_EXPIRE_HOURS,
     )
+
+
+@router.get("/tenants", response_model=list[TenantMembership])
+async def list_my_tenants(
+    token: str = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_db),
+) -> list[TenantMembership]:
+    """Return all orgs the current Firebase user belongs to. No X-Tenant-Slug needed."""
+    try:
+        decoded = verify_firebase_token(token)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid Firebase token")
+
+    firebase_uid = decoded.get("uid")
+    if not firebase_uid:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.tenant))
+        .join(Tenant)
+        .where(
+            User.firebase_uid == firebase_uid,
+            User.is_active == True,  # noqa: E712
+            Tenant.is_active == True,  # noqa: E712
+        )
+    )
+    users = result.scalars().all()
+    return [
+        TenantMembership(
+            tenant=TenantResponse.model_validate(u.tenant),
+            role=u.role,
+        )
+        for u in users
+    ]
 
 
 @router.get("/me", response_model=UserResponse)

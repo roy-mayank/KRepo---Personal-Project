@@ -22,7 +22,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
 
   const handleSuccess = () => {
-    navigate({ to: '/dashboard' })
+    navigate({ to: '/onboard' })
   }
 
   const handleOAuth = async (provider) => {
