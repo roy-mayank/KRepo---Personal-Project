@@ -12,9 +12,11 @@ from .base import BaseIntegration
 # Each integration must subclass BaseIntegration and implement
 # `async def fetch_documents(self) -> AsyncIterator[Document]`.
 from .github import GitHubIntegration  # noqa: E402
+from .notion import NotionIntegration  # noqa: E402
 
 INTEGRATIONS: Dict[str, Type[BaseIntegration]] = {
     "github": GitHubIntegration,
+    "notion": NotionIntegration,
 }
 
 

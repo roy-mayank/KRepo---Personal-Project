@@ -31,6 +31,14 @@ class Settings(BaseSettings):
     AZURE_DEVOPS_ORG: str = ""
     AZURE_DEVOPS_REPOS: str = ""  # comma-separated "project/repo" pairs
 
+    # Notion OAuth
+    NOTION_CLIENT_ID: str = ""
+    NOTION_CLIENT_SECRET: str = ""
+    NOTION_REDIRECT_URI: str = ""  # e.g. http://localhost:8000/integrations/notion/callback
+
+    # Integration credentials encryption
+    CREDENTIALS_ENCRYPTION_KEY: str = ""  # Fernet key for encrypting OAuth tokens at rest
+
     # Parsing
     LEMONFOX_API_KEY: str = ""
     LLAMA_CLOUD_API_KEY: str = ""

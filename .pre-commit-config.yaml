@@ -3,21 +3,21 @@ repos:
     hooks:
       - id: ruff-format
         name: ruff format
-        entry: uv run --directory backend ruff format
+        entry: bash -c 'files=(); for f in "$@"; do files+=("${f#backend/}"); done; cd backend && uv run ruff format "${files[@]}"' --
         language: system
         types: [python]
         files: ^backend/
 
       - id: ruff-lint
         name: ruff lint
-        entry: uv run --directory backend ruff check --fix
+        entry: bash -c 'files=(); for f in "$@"; do files+=("${f#backend/}"); done; cd backend && uv run ruff check --fix "${files[@]}"' --
         language: system
         types: [python]
         files: ^backend/
 
       - id: prettier
         name: prettier
-        entry: pnpm --dir frontend exec prettier --write
+        entry: bash -c 'files=(); for f in "$@"; do files+=("${f#frontend/}"); done; cd frontend && pnpm exec prettier --write "${files[@]}"' --
         language: system
         types_or: [ts, tsx, css, json]
         files: ^frontend/src/

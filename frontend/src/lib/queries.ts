@@ -152,6 +152,71 @@ export function useGitHubIngest(): UseMutationResult<unknown, ApiFetchError, Git
   })
 }
 
+// ── Integrations ───────────────────────────────────────────────────────────
+
+export interface IntegrationConnection {
+  provider: string
+  workspace_name: string | null
+  workspace_id: string | null
+  status: string
+  connected_at: string
+  last_sync_at: string | null
+}
+
+interface ConnectResponse {
+  authorize_url: string
+}
+
+interface SyncResponse {
+  message: string
+}
+
+interface SyncStatusResponse {
+  status: Record<string, string>
+}
+
+export function useIntegrationConnections(): UseQueryResult<
+  IntegrationConnection[],
+  ApiFetchError
+> {
+  return useQuery<IntegrationConnection[], ApiFetchError>({
+    queryKey: ['integrations', 'connections'],
+    queryFn: () => apiFetch<IntegrationConnection[]>('/integrations/connections'),
+  })
+}
+
+export function useConnectIntegration(): UseMutationResult<ConnectResponse, ApiFetchError, string> {
+  return useMutation<ConnectResponse, ApiFetchError, string>({
+    mutationFn: (provider) => apiFetch<ConnectResponse>(`/integrations/${provider}/connect`),
+  })
+}
+
+export function useSyncIntegration(): UseMutationResult<SyncResponse, ApiFetchError, string> {
+  const queryClient = useQueryClient()
+  return useMutation<SyncResponse, ApiFetchError, string>({
+    mutationFn: (provider) =>
+      apiFetch<SyncResponse>(`/integrations/${provider}/sync`, { method: 'POST' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['integrations', 'connections'] }),
+  })
+}
+
+export function useDisconnectIntegration(): UseMutationResult<SyncResponse, ApiFetchError, string> {
+  const queryClient = useQueryClient()
+  return useMutation<SyncResponse, ApiFetchError, string>({
+    mutationFn: (provider) =>
+      apiFetch<SyncResponse>(`/integrations/${provider}/disconnect`, { method: 'DELETE' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['integrations', 'connections'] }),
+  })
+}
+
+export function useSyncStatus(): UseQueryResult<SyncStatusResponse, ApiFetchError> {
+  return useQuery<SyncStatusResponse, ApiFetchError>({
+    queryKey: ['integrations', 'sync-status'],
+    queryFn: () => apiFetch<SyncStatusResponse>('/integrations/sync/status'),
+    refetchInterval: 3000,
+  })
+}
+
 // ── Auth / Invites ──────────────────────────────────────────────────────────
 
 export function useInviteUser(): UseMutationResult<
