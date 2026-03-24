@@ -25,6 +25,7 @@ dependencies = [
     "firebase-admin>=6.0",
     "psycopg2-binary>=2.9.11",
     "cryptography>=46.0.5",
+    "langfuse>=4.0.1",
 ]
 
 [dependency-groups]

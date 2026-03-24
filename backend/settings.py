@@ -1,4 +1,9 @@
+from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
+
+# Load .env into os.environ early so third-party SDKs (e.g. Langfuse)
+# that read env vars directly can find them.
+load_dotenv()
 
 
 class Settings(BaseSettings):
@@ -38,6 +43,11 @@ class Settings(BaseSettings):
 
     # Integration credentials encryption
     CREDENTIALS_ENCRYPTION_KEY: str = ""  # Fernet key for encrypting OAuth tokens at rest
+
+    # Langfuse observability
+    LANGFUSE_SECRET_KEY: str = ""
+    LANGFUSE_PUBLIC_KEY: str = ""
+    LANGFUSE_BASE_URL: str = "https://cloud.langfuse.com"
 
     # Parsing
     LEMONFOX_API_KEY: str = ""

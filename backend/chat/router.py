@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langfuse.langchain import CallbackHandler as LangfuseHandler
 from pydantic import BaseModel, SecretStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -353,10 +354,22 @@ async def chat(
 
     llm = _get_llm()
 
+    # Langfuse tracing config
+    langfuse_config: dict[str, Any] = {}
+    if settings.LANGFUSE_PUBLIC_KEY:
+        langfuse_config = {
+            "callbacks": [LangfuseHandler()],
+            "metadata": {
+                "langfuse_user_id": str(current_user.id),
+                "langfuse_session_id": str(conversation_id),
+                "langfuse_tags": [request.mode or "chat", f"tenant:{tenant_id}"],
+            },
+        }
+
     async def stream_response():
         full_content = ""
 
-        async for chunk in llm.astream(lc_messages):
+        async for chunk in llm.astream(lc_messages, config=langfuse_config):
             text = chunk.content
             if isinstance(text, str) and text:
                 full_content += text

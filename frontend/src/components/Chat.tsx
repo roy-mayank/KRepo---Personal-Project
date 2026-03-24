@@ -39,11 +39,17 @@ export default function Chat(): React.JSX.Element {
   const [status, setStatus] = useState<Status>('ready')
   const abortRef = useRef<AbortController | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Auto-focus input on mount
   useEffect(() => {
     inputRef.current?.focus()
   }, [])
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
 
   // Sidebar: list of conversations
   const { data: conversations = [] } = useQuery<ConversationSummary[]>({
@@ -164,6 +170,8 @@ export default function Chat(): React.JSX.Element {
     } finally {
       setStatus('ready')
       abortRef.current = null
+      // Re-focus input after reply
+      setTimeout(() => inputRef.current?.focus(), 0)
     }
   }, [input, status, messages, conversationId, queryClient])
 
@@ -209,8 +217,8 @@ export default function Chat(): React.JSX.Element {
       </div>
 
       {/* Chat area */}
-      <Card className="flex flex-1 flex-col rounded-none border-0">
-        <ScrollArea className="flex-1 p-4">
+      <Card className="flex flex-1 flex-col rounded-none border-0 overflow-hidden">
+        <div className="flex-1 overflow-y-auto p-4">
           <div className="flex flex-col gap-3">
             {messages.length === 0 && (
               <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
@@ -246,10 +254,11 @@ export default function Chat(): React.JSX.Element {
                 </div>
               </div>
             )}
+            <div ref={messagesEndRef} />
           </div>
-        </ScrollArea>
+        </div>
 
-        <form onSubmit={handleSubmit} className="flex gap-2 border-t p-4">
+        <form onSubmit={handleSubmit} className="flex gap-2 border-t p-4 shrink-0">
           <Input
             ref={inputRef}
             value={input}
