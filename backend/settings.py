@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     NOTION_CLIENT_SECRET: str = ""
     NOTION_REDIRECT_URI: str = ""  # e.g. http://localhost:8000/integrations/notion/callback
 
+    # Google OAuth
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    GOOGLE_REDIRECT_URI: str = ""  # e.g. http://localhost:8000/integrations/google_drive/callback
+
     # Integration credentials encryption
     CREDENTIALS_ENCRYPTION_KEY: str = ""  # Fernet key for encrypting OAuth tokens at rest
 

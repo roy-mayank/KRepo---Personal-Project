@@ -28,6 +28,10 @@ class OAuthProviderConfig:
     extract_credentials: Callable[[dict], CredentialResult] = field(
         default=lambda d: CredentialResult(access_token=d["access_token"])
     )
+    # Extra params appended to the authorization URL (provider-specific)
+    extra_authorize_params: dict[str, str] = field(default_factory=dict)
+    # "basic" = HTTP Basic Auth (default), "body" = client credentials in form body
+    token_endpoint_auth: str = "basic"
 
 
 # ---------------------------------------------------------------------------
@@ -46,6 +50,8 @@ def get_oauth_provider(name: str) -> OAuthProviderConfig | None:
     if name not in _OAUTH_PROVIDERS:
         if name == "notion":
             _register_notion()
+        elif name == "google_drive":
+            _register_google_drive()
     return _OAUTH_PROVIDERS.get(name)
 
 
@@ -114,3 +120,46 @@ def _register_notion() -> None:
 
 
 _register_notion()
+
+
+# ---------------------------------------------------------------------------
+# Google Drive provider registration
+# ---------------------------------------------------------------------------
+
+
+def _google_extract(data: dict) -> CredentialResult:
+    import time
+
+    expires_in = data.get("expires_in", 3600)
+    return CredentialResult(
+        access_token=data["access_token"],
+        refresh_token=data.get("refresh_token"),
+        expires_at=time.time() + expires_in,
+        workspace_name="Google Drive",
+        workspace_id="",
+    )
+
+
+def _register_google_drive() -> None:
+    if not settings.GOOGLE_CLIENT_ID:
+        return
+    register_oauth_provider(
+        OAuthProviderConfig(
+            provider="google_drive",
+            authorize_url="https://accounts.google.com/o/oauth2/v2/auth",
+            token_url="https://oauth2.googleapis.com/token",
+            client_id=settings.GOOGLE_CLIENT_ID,
+            client_secret=settings.GOOGLE_CLIENT_SECRET,
+            redirect_uri=settings.GOOGLE_REDIRECT_URI,
+            scopes=["https://www.googleapis.com/auth/drive.readonly"],
+            extract_credentials=_google_extract,
+            extra_authorize_params={
+                "access_type": "offline",
+                "prompt": "consent",
+            },
+            token_endpoint_auth="body",
+        )
+    )
+
+
+_register_google_drive()

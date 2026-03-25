@@ -32,6 +32,14 @@ const INTEGRATIONS: Integration[] = [
     oauthEnabled: true,
   },
   {
+    id: 'google_drive',
+    name: 'Google Drive',
+    letter: 'G',
+    iconColor: '#4285F4',
+    description: 'Import Google Docs, Sheets, and Slides from your Drive into your knowledge base.',
+    oauthEnabled: true,
+  },
+  {
     id: 'slack',
     name: 'Slack',
     letter: 'S',

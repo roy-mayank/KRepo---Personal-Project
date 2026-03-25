@@ -71,6 +71,7 @@ async def connect(
         "response_type": "code",
         "owner": "user",
         "state": state,
+        **config.extra_authorize_params,
     }
     if config.scopes:
         params["scope"] = " ".join(config.scopes)
@@ -99,15 +100,29 @@ async def callback(
 
     # Exchange authorization code for access token
     async with httpx.AsyncClient(timeout=15) as client:
-        resp = await client.post(
-            config.token_url,
-            json={
-                "grant_type": "authorization_code",
-                "code": code,
-                "redirect_uri": config.redirect_uri,
-            },
-            auth=(config.client_id, config.client_secret),
-        )
+        if config.token_endpoint_auth == "body":
+            # Send client credentials in form body (e.g. Google)
+            resp = await client.post(
+                config.token_url,
+                data={
+                    "grant_type": "authorization_code",
+                    "code": code,
+                    "redirect_uri": config.redirect_uri,
+                    "client_id": config.client_id,
+                    "client_secret": config.client_secret,
+                },
+            )
+        else:
+            # Default: HTTP Basic Auth + JSON body (e.g. Notion)
+            resp = await client.post(
+                config.token_url,
+                json={
+                    "grant_type": "authorization_code",
+                    "code": code,
+                    "redirect_uri": config.redirect_uri,
+                },
+                auth=(config.client_id, config.client_secret),
+            )
 
     if resp.status_code != 200:
         return _error_html(f"Token exchange failed: {resp.text}")
