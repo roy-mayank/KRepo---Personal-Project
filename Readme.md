@@ -1,41 +1,56 @@
-### KRepo (K==Knowledge)
 
-##### The Idea
+### A Graph-Based RAG Framework for Technical Onboarding and Knowledge Retention
 
-A knowledge repository (technical and maybe even non-tech) cum onboarding AI integrations
+## 1. Research Overview
+This project investigates the efficacy of **Retrieval-Augmented Generation (RAG)** combined with **Knowledge Graph (KG)** architectures to mitigate "Institutional Memory Loss" in high-complexity engineering environments. The core hypothesis is that transforming unstructured, multimodal technical data into a dynamic, navigable graph significantly reduces the cognitive load required for system mastery compared to traditional linear documentation.
 
-I made the assumption that orgs could benefit from the availability of a dynamic learning environment for new employees or new complex products. Using this assumption, I decided to develop a platform where companies could upload large complex technical materials with information (in video or audio format) from senior engineers - those that are usually burdened with all the heavy information (and can technically cripple an org) - use agents to break down all the information. Then break it down into a graph learning format friendly for all levels of information.
+## 2. Problem Statement
+In large-scale technical organizations, critical system architecture is often "siloed" within the oral tradition of senior engineers or buried in dense, unindexed documentation. This creates a "Knowledge Bottleneck" that hinders onboarding efficiency. This research proposes an **Autonomous Knowledge Synthesis** pipeline to automate the extraction and visualization of these complex relationships.
 
-Additional features would include:
+## 3. Technical Architecture & Methodology
 
-- indexing for quick access of concepts, with the option to dive into more niche topics on each screen
-- Option to ask questions ofc (chatbot)
-- Where in the learning curve am I? (new "Onboarding" tab that generates concept lists and learning paths)
+### Phase 1: Semantic Indexing & Grounding
+* **Orchestration:** [LangChain](https://www.langchain.com/) for document preprocessing and recursive character splitting.
+* **Vector Engine:** [Pinecone](https://www.pinecone.io/) for high-dimensional similarity searches.
+* **Inference:** Claude-3-series wrapper for context-aware response generation.
+* **Constraint:** Implementation of **Source-Anchored Grounding** to ensure 0% hallucination; every response is programmatically linked to a specific document coordinate (page/paragraph).
 
-##### Intended Positioning Statement (temp)
+### Phase 2: Multimodal Extraction (STT)
+* **Aural Processing:** Utilizing **OpenAI Whisper** to process recorded technical seminars, sprint reviews, and architectural deep-dives.
+* **Entity-Relationship Extraction:** Developing custom prompts to output **Structured JSON** triplets (Subject-Predicate-Object) from transcripts, capturing the "hidden" logic of system dependencies.
 
-Positioning: For organisations managing high complexity systems, LC is an intelligent onboarding and maintenance LMS tool that turns long technical documentation and chief engineer knowledge into digestable, graph-based learning maps reducing the amount of time and effort engineers need to keep up.
+### Phase 3: Knowledge Graph Visualization
+* **Graph Engine:** [PyVis](https://pyvis.readthedocs.io/) and NetworkX for rendering interactive 2D/3D topologies.
+* **Dynamic Learning Paths:** A specialized "Onboarding" module that generates individualized concept lists and prerequisite chains based on specific researcher roles or academic requirements.
 
-##### Technical Architecture
+---
 
-### MVP (Deadline: 15 March 2026)
+## 4. Key Features (Experimental)
+* **Deep-Dive Indexing:** Hierarchical navigation allowing researchers to move from high-level system overviews to niche technical sub-components.
+* **Contextual Chatbot:** A grounded interface for querying the dataset with full transparency of source materials.
+* **Progress Tracking:** A "Learning Path" generator that monitors the participant’s coverage of the knowledge graph.
 
-###### Phase 1 (PDF analysis):
+## 5. Proposed Evaluation Metrics
+To validate the effectiveness of the AKS framework, the following metrics will be tracked:
+1.  **Retrieval Accuracy:** Precision and Recall of the RAG pipeline compared to standard keyword searches.
+2.  **Cognitive Load Reduction:** Qualitative and quantitative analysis of time-to-information-retrieval among research participants.
+3.  **Graph Fidelity:** The accuracy of the STT-to-JSON pipeline in identifying valid architectural relationships.
 
-Langchain? (RAG) -> Pinecone (VectorDB) -> Claude Wrapper
+---
 
-Simple Chat layout to ask questions on large documents. No hallucniation space (every response links directly to a part of the document)
+## 6. Future Work: Visual Documentation
+Future iterations of this research will explore the integration of **Vision-capable LLMs** to interpret technical diagrams, flowcharts, and manual schematics, further enriching the Knowledge Graph's multimodal capabilities.
 
-Q: What about images in manuals? Vision-capable models? but too expensive for MVP
+---
 
-###### Phase 2 (STT):
+## 7. Setup & Installation (Local Research Environment)
+```bash
+# Clone the repository
+git clone [https://github.com/your-username/aks-research.git](https://github.com/your-username/aks-research.git)
 
-SuperWhisper/OpenAI Whisper -> Langchain Audio Extraction
+# Install dependencies
+pip install langchain pinecone-client openai pyvis
 
-Structured JSON extracting entity-relationships o/p from audio (but WHAT audio exactly? Zoom? intenational charting??)
-
-###### Phase 3 (Linking):
-
-PDF + STT mix -> PyVis -> Graph UI/UX (again wrapper maybe?)
-
-Personalized role-specific knowledge passing based on prompts from hiring teams expectations from employee
+# Configure environment variables
+export PINECONE_API_KEY='your_key'
+export OPENAI_API_KEY='your_key'
