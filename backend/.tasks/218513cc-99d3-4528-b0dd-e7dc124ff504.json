@@ -1,0 +1,98 @@
+[
+  {
+    "id": "27cc9b5b-d728-4b8b-9d2c-ae11097b6eb7",
+    "title": "demo",
+    "description": "demo",
+    "required_skills": [
+      "demo"
+    ],
+    "assignee_name": "demo",
+    "created_by": null,
+    "learning_path": {
+      "nodes": [
+        {
+          "id": "understand_demo_basics",
+          "title": "Understanding Demo Fundamentals",
+          "description": "Learn what a demo is, its purpose in product development, and why demos matter for stakeholder communication.",
+          "prerequisites": [],
+          "xp": 25
+        },
+        {
+          "id": "demo_audience_analysis",
+          "title": "Identifying Your Demo Audience",
+          "description": "Understand different audience types (executives, technical teams, end-users) and how to tailor messaging accordingly.",
+          "prerequisites": [
+            "understand_demo_basics"
+          ],
+          "xp": 25
+        },
+        {
+          "id": "demo_structure_planning",
+          "title": "Planning Demo Structure",
+          "description": "Learn to organize demos with clear flow: introduction, problem statement, solution walkthrough, and call-to-action.",
+          "prerequisites": [
+            "understand_demo_basics"
+          ],
+          "xp": 50
+        },
+        {
+          "id": "demo_technical_setup",
+          "title": "Technical Setup and Tools",
+          "description": "Master the tools and environment needed for smooth demo delivery, including backup plans and technical troubleshooting.",
+          "prerequisites": [
+            "understand_demo_basics"
+          ],
+          "xp": 50
+        },
+        {
+          "id": "storytelling_techniques",
+          "title": "Effective Storytelling in Demos",
+          "description": "Learn narrative techniques to engage audiences through compelling stories that highlight product value and user benefits.",
+          "prerequisites": [
+            "demo_audience_analysis"
+          ],
+          "xp": 50
+        },
+        {
+          "id": "demo_live_delivery",
+          "title": "Delivering Live Demos",
+          "description": "Develop skills for real-time demo execution including pacing, handling interruptions, and maintaining audience engagement.",
+          "prerequisites": [
+            "demo_structure_planning",
+            "demo_technical_setup"
+          ],
+          "xp": 75
+        },
+        {
+          "id": "handling_objections",
+          "title": "Managing Questions and Objections",
+          "description": "Learn techniques to address audience concerns, unexpected questions, and objections while maintaining demo momentum.",
+          "prerequisites": [
+            "storytelling_techniques",
+            "demo_audience_analysis"
+          ],
+          "xp": 75
+        },
+        {
+          "id": "demo_metrics_feedback",
+          "title": "Measuring Demo Effectiveness",
+          "description": "Understand how to collect feedback, track demo metrics, and iterate based on audience response and conversion data.",
+          "prerequisites": [
+            "demo_live_delivery"
+          ],
+          "xp": 50
+        },
+        {
+          "id": "advanced_demo_strategy",
+          "title": "Advanced Demo Customization",
+          "description": "Master creating tailored demos for different scenarios, A/B testing variations, and optimizing conversion funnels.",
+          "prerequisites": [
+            "handling_objections",
+            "demo_metrics_feedback"
+          ],
+          "xp": 100
+        }
+      ]
+    }
+  }
+]

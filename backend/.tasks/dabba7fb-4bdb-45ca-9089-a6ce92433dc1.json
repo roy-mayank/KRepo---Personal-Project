@@ -1,0 +1,97 @@
+[
+  {
+    "id": "f09a8df7-69a5-424f-9b4d-a0626c62523d",
+    "title": "Create AI feature for generating financial reports",
+    "description": "Use the financial reports document to understand key fundamentals needed to generate a AI application that can autonomously create financial reports",
+    "required_skills": [
+      "Financial reports",
+      "OpenAI/Claude integrations",
+      "FastAPI"
+    ],
+    "assignee_name": "test",
+    "created_by": "Jane Doe",
+    "learning_path": {
+      "nodes": [
+        {
+          "id": "financial_report_fundamentals",
+          "title": "Financial Reports Fundamentals",
+          "description": "Learn key components of financial reports including balance sheets, income statements, and cash flow statements. Understand the structure and purpose of each report type.",
+          "prerequisites": [],
+          "xp": 50
+        },
+        {
+          "id": "openai_api_basics",
+          "title": "OpenAI API Basics",
+          "description": "Understand OpenAI API authentication, endpoints, and how to make basic requests. Learn about models, tokens, and API rate limits.",
+          "prerequisites": [],
+          "xp": 50
+        },
+        {
+          "id": "fastapi_fundamentals",
+          "title": "FastAPI Fundamentals",
+          "description": "Learn FastAPI framework basics including routing, request/response handling, and creating REST endpoints. Understand async/await patterns.",
+          "prerequisites": [],
+          "xp": 50
+        },
+        {
+          "id": "prompt_engineering_finance",
+          "title": "Prompt Engineering for Finance",
+          "description": "Master crafting effective prompts for financial data analysis. Learn how to structure prompts to generate accurate, formatted financial reports.",
+          "prerequisites": [
+            "openai_api_basics",
+            "financial_report_fundamentals"
+          ],
+          "xp": 75
+        },
+        {
+          "id": "fastapi_openai_integration",
+          "title": "FastAPI and OpenAI Integration",
+          "description": "Integrate OpenAI API calls into FastAPI endpoints. Handle streaming responses, error management, and request validation.",
+          "prerequisites": [
+            "fastapi_fundamentals",
+            "openai_api_basics"
+          ],
+          "xp": 75
+        },
+        {
+          "id": "financial_data_parsing",
+          "title": "Financial Data Parsing and Validation",
+          "description": "Learn to parse financial data inputs, validate accuracy, and format data for AI consumption. Understand data transformation for report generation.",
+          "prerequisites": [
+            "financial_report_fundamentals"
+          ],
+          "xp": 50
+        },
+        {
+          "id": "report_generation_pipeline",
+          "title": "AI Report Generation Pipeline",
+          "description": "Build an end-to-end pipeline that accepts financial data, generates reports via AI, and returns formatted output. Integrate data parsing with API calls.",
+          "prerequisites": [
+            "fastapi_openai_integration",
+            "financial_data_parsing",
+            "prompt_engineering_finance"
+          ],
+          "xp": 100
+        },
+        {
+          "id": "error_handling_testing",
+          "title": "Error Handling and Testing",
+          "description": "Implement robust error handling for API failures, invalid inputs, and edge cases. Write unit and integration tests for the report generation system.",
+          "prerequisites": [
+            "report_generation_pipeline"
+          ],
+          "xp": 75
+        },
+        {
+          "id": "performance_optimization",
+          "title": "Performance and Cost Optimization",
+          "description": "Optimize API calls, implement caching, batch processing, and cost management strategies. Monitor token usage and response times.",
+          "prerequisites": [
+            "report_generation_pipeline"
+          ],
+          "xp": 100
+        }
+      ]
+    }
+  }
+]
