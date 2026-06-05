@@ -19,12 +19,13 @@ def _is_railway_postgres(host: str) -> bool:
 
 
 def _connect_args(database_url: str) -> dict:
-    """SSL only where the server expects it; Railway and localhost skip SSL."""
+    """SSL only where the server expects it; Railway and localhost disable SSL."""
     if not database_url:
         return {}
     host = urlparse(database_url.replace("+asyncpg", "")).hostname or ""
     if host in ("localhost", "127.0.0.1") or _is_railway_postgres(host):
-        return {}
+        # asyncpg still attempts SSL upgrade unless explicitly disabled
+        return {"ssl": False}
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
