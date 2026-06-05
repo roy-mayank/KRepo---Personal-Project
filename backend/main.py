@@ -29,6 +29,8 @@ _cors_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
+    # Local Vite may use any port (5173, 5175, etc.) when hitting a remote API
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
