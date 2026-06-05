@@ -13,12 +13,17 @@ class Base(DeclarativeBase):
     pass
 
 
+def _is_railway_postgres(host: str) -> bool:
+    """Railway private and public Postgres endpoints do not use SSL."""
+    return host.endswith(".railway.internal") or host.endswith(".proxy.rlwy.net")
+
+
 def _connect_args(database_url: str) -> dict:
-    """Remote Postgres hosts may require SSL; localhost does not."""
+    """SSL only where the server expects it; Railway and localhost skip SSL."""
     if not database_url:
         return {}
     host = urlparse(database_url.replace("+asyncpg", "")).hostname or ""
-    if host in ("localhost", "127.0.0.1"):
+    if host in ("localhost", "127.0.0.1") or _is_railway_postgres(host):
         return {}
     ctx = ssl.create_default_context()
     ctx.check_hostname = False

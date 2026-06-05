@@ -28,6 +28,8 @@ REQUIRE_PGVECTOR=true
 
 (`Postgres` is the default service name — adjust if you renamed it.)
 
+Use the **private** `DATABASE_URL` reference — not `DATABASE_PUBLIC_URL` (the `*.proxy.rlwy.net` URL). Backend and Postgres must be in the same Railway project.
+
 The backend runs `CREATE EXTENSION IF NOT EXISTS vector` and creates tables on startup.
 
 ### 3. Configure the backend
