@@ -1,6 +1,8 @@
 # Backend secrets
 backend/.env
 
+frontend/.env
+
 # Node
 node_modules/
 

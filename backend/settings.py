@@ -1,13 +1,25 @@
+from pathlib import Path
+
 from dotenv import load_dotenv
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
-# Load .env into os.environ early so third-party SDKs (e.g. Langfuse)
-# that read env vars directly can find them.
-load_dotenv()
+_BACKEND_DIR = Path(__file__).resolve().parent
+_BACKEND_ENV = _BACKEND_DIR / ".env"
+_ROOT_ENV = _BACKEND_DIR.parent / ".env"
+
+# Load env vars early so third-party SDKs (e.g. Langfuse) can read them.
+# Repo-root .env is the usual local store; backend/.env overrides when present.
+if _ROOT_ENV.exists():
+    load_dotenv(dotenv_path=_ROOT_ENV)
+if _BACKEND_ENV.exists():
+    load_dotenv(dotenv_path=_BACKEND_ENV, override=True)
+
+_ENV_FILES = tuple(p for p in (_ROOT_ENV, _BACKEND_ENV) if p.exists())
 
 
 class Settings(BaseSettings):
-    model_config = {"env_file": ".env"}
+    model_config = {"env_file": _ENV_FILES}
 
     # LLM
     ANTHROPIC_API_KEY: str = ""
@@ -58,12 +70,32 @@ class Settings(BaseSettings):
     LEMONFOX_API_KEY: str = ""
     LLAMA_CLOUD_API_KEY: str = ""
 
-    # Database
+    # Database — Railway Postgres (pgvector template) or local Postgres
     DATABASE_URL: str = ""
+    REQUIRE_PGVECTOR: bool = False
+
+    # CORS — comma-separated origins; include your Railway frontend URL in production
+    CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     # Auth
     FIREBASE_SERVICE_ACCOUNT: str = ""  # base64-encoded service account JSON
     INVITE_TOKEN_EXPIRE_HOURS: int = 72
+
+    @field_validator("DATABASE_URL", mode="after")
+    @classmethod
+    def normalize_database_url(cls, value: str) -> str:
+        """Ensure SQLAlchemy async engine gets the asyncpg driver."""
+        if not value:
+            raise ValueError(
+                "DATABASE_URL is not set. For Railway, reference the Postgres service "
+                "(${{Postgres.DATABASE_URL}}). For local dev, use repo-root .env "
+                "(e.g. postgresql+asyncpg://postgres:password@127.0.0.1:5432/krepo)."
+            )
+        if value.startswith("postgres://"):
+            return value.replace("postgres://", "postgresql+asyncpg://", 1)
+        if value.startswith("postgresql://") and "+asyncpg" not in value:
+            return value.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return value
 
 
 settings = Settings()

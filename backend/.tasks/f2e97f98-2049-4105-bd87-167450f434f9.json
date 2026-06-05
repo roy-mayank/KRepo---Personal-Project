@@ -1,0 +1,94 @@
+[
+  {
+    "id": "312cda70-8d3f-4c41-981c-5bcbf445af25",
+    "title": "sample",
+    "description": "sample",
+    "required_skills": [],
+    "assignee_name": null,
+    "created_by": null,
+    "learning_path": {
+      "nodes": [
+        {
+          "id": "understand_task_basics",
+          "title": "Understand Task Fundamentals",
+          "description": "Learn what the task involves, its purpose, and how it fits into the broader workflow. Review any existing documentation or guidelines.",
+          "prerequisites": [],
+          "xp": 25
+        },
+        {
+          "id": "review_tools_environment",
+          "title": "Review Tools and Environment",
+          "description": "Familiarize yourself with the tools, software, and systems needed to complete the task. Set up your workspace and accounts.",
+          "prerequisites": [],
+          "xp": 25
+        },
+        {
+          "id": "learn_task_workflow",
+          "title": "Learn Task Workflow Steps",
+          "description": "Understand the sequential steps and process required to execute the task successfully. Document the workflow for reference.",
+          "prerequisites": [
+            "understand_task_basics"
+          ],
+          "xp": 50
+        },
+        {
+          "id": "study_quality_standards",
+          "title": "Study Quality Standards",
+          "description": "Review quality expectations, acceptance criteria, and any compliance requirements specific to this task.",
+          "prerequisites": [
+            "understand_task_basics"
+          ],
+          "xp": 50
+        },
+        {
+          "id": "practice_core_techniques",
+          "title": "Practice Core Techniques",
+          "description": "Perform hands-on practice of the main techniques and procedures required in the task with guidance from documentation or mentor.",
+          "prerequisites": [
+            "learn_task_workflow",
+            "review_tools_environment"
+          ],
+          "xp": 50
+        },
+        {
+          "id": "review_common_errors",
+          "title": "Review Common Errors",
+          "description": "Learn about frequent mistakes, pitfalls, and edge cases encountered when performing this task to avoid them.",
+          "prerequisites": [
+            "practice_core_techniques"
+          ],
+          "xp": 50
+        },
+        {
+          "id": "complete_supervised_execution",
+          "title": "Complete Supervised Execution",
+          "description": "Execute the task under observation with feedback from an experienced team member to validate competency.",
+          "prerequisites": [
+            "practice_core_techniques",
+            "study_quality_standards",
+            "review_common_errors"
+          ],
+          "xp": 100
+        },
+        {
+          "id": "independent_task_execution",
+          "title": "Independent Task Execution",
+          "description": "Successfully complete the task independently while maintaining quality standards and documenting any issues encountered.",
+          "prerequisites": [
+            "complete_supervised_execution"
+          ],
+          "xp": 100
+        },
+        {
+          "id": "optimize_and_document",
+          "title": "Optimize and Document Process",
+          "description": "Refine your approach for efficiency, identify improvements, and create or update documentation to help future employees learn this task.",
+          "prerequisites": [
+            "independent_task_execution"
+          ],
+          "xp": 100
+        }
+      ]
+    }
+  }
+]

@@ -2,13 +2,13 @@ import { initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyBMfhyc-5L-N693ITCTDwtHrbkaKS4Mhkg',
-  authDomain: 'krepo-cd270.firebaseapp.com',
-  projectId: 'krepo-cd270',
-  storageBucket: 'krepo-cd270.firebasestorage.app',
-  messagingSenderId: '485211856700',
-  appId: '1:485211856700:web:25f6cd8660ec8bdc988839',
-  measurementId: 'G-2HFPRNDW1Z',
+  apiKey: 'AIzaSyDZeCTVSPJ55RsC_5QqeIhvzznK_pFuZJc',
+  authDomain: 'krepo-roy.firebaseapp.com',
+  projectId: 'krepo-roy',
+  storageBucket: 'krepo-roy.firebasestorage.app',
+  messagingSenderId: '1078585984937',
+  appId: '1:1078585984937:web:ca502c7c9f8489ddb366b8',
+  measurementId: 'G-N8L79ZK7R7',
 }
 
 const app = initializeApp(firebaseConfig)

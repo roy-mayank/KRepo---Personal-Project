@@ -1,0 +1,24 @@
+# Postgres with pgvector for local dev (RAG/document ingestion).
+# Start: docker compose up -d
+# DATABASE_URL=postgresql+asyncpg://postgres:password@127.0.0.1:5432/krepo
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: krepo
+      # Use a subdirectory under the volume mount (required on Railway — mount root has lost+found)
+      PGDATA: /var/lib/postgresql/data
+    volumes:
+      - krepo_pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d krepo"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  krepo_pgdata:

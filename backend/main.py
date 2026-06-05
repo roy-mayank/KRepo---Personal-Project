@@ -12,6 +12,7 @@ from onboarding.router import router as onboarding_router
 from rag.documents import router as documents_router
 from rag.github_router import router as github_router
 from rag.router import router as rag_router
+from settings import settings
 
 
 @asynccontextmanager
@@ -23,9 +24,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="KRepo API", lifespan=lifespan)
 
+_cors_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
