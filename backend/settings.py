@@ -81,6 +81,16 @@ class Settings(BaseSettings):
     FIREBASE_SERVICE_ACCOUNT: str = ""  # base64-encoded service account JSON
     INVITE_TOKEN_EXPIRE_HOURS: int = 72
 
+    @field_validator("FIREBASE_SERVICE_ACCOUNT", mode="after")
+    @classmethod
+    def require_firebase_service_account(cls, value: str) -> str:
+        if not value:
+            raise ValueError(
+                "FIREBASE_SERVICE_ACCOUNT is not set. Paste the base64-encoded "
+                "service account JSON on the Railway backend service."
+            )
+        return value
+
     @field_validator("DATABASE_URL", mode="after")
     @classmethod
     def normalize_database_url(cls, value: str) -> str:

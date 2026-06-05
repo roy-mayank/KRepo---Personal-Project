@@ -58,6 +58,8 @@ Add any other integration keys from `backend/.env.example` as needed.
 
 Verify: open `https://YOUR-BACKEND.up.railway.app/health` → `{"status":"ok"}`.
 
+**Troubleshooting:** If the browser shows CORS or `net::ERR_FAILED`, check `/health` first. A `502` means the backend crashed on startup — open the **backend** service deploy logs in Railway (not the frontend). Common causes: missing `DATABASE_URL` reference, missing `FIREBASE_SERVICE_ACCOUNT`, or wrong service root directory (must be `backend`).
+
 ### 4. Configure the frontend
 
 On the **frontend** service, set **before the first build** (Vite bakes env vars at build time):

@@ -37,6 +37,8 @@ _engine = create_async_engine(
     echo=False,
     connect_args=_connect_args(settings.DATABASE_URL),
 )
+_db_host = urlparse(settings.DATABASE_URL.replace("+asyncpg", "")).hostname or "(unknown)"
+print(f"DEBUG: Database host: {_db_host}")
 _session_factory = async_sessionmaker(_engine, expire_on_commit=False)
 
 
